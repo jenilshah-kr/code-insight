@@ -7,7 +7,7 @@ import {
 } from '@/common/helpers/data-reader'
 import { getCachedSessions, getCachedDerived } from '@/common/helpers/session-cache'
 import { calcCostFromUsage } from '@/common/helpers/rates'
-import { workspaceDisplayName } from '@/common/helpers/formatters'
+import { workspaceDisplayName, encodeSlug } from '@/common/helpers/formatters'
 import type { WorkspaceSummary, ConversationWithFacet } from '@/common/types/models'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +56,7 @@ async function _compileWorkspaceList() {
   const projects: WorkspaceSummary[] = []
 
   for (const [projectPath, sessionList] of byPath.entries()) {
-    const slug = pathToSlugMap.get(projectPath) ?? projectPath.replace(/\//g, '-')
+    const slug = pathToSlugMap.get(projectPath) ?? encodeSlug(projectPath)
 
     const totalMessages = sessionList.reduce(
       (s, m) => s + (m.user_message_count ?? 0) + (m.assistant_message_count ?? 0), 0
@@ -158,8 +158,10 @@ export async function compileWorkspaceDetail(slug: string) {
   let sessions = allSessions.filter(s => s.project_path === projectPath)
 
   if (sessions.length === 0) {
-    const lastSegment = projectPath.split('/').filter(Boolean).pop() ?? ''
-    sessions = allSessions.filter(s => s.project_path?.endsWith('/' + lastSegment))
+    const lastSegment = path.basename(projectPath)
+    sessions = allSessions.filter(s =>
+      s.project_path ? path.basename(s.project_path) === lastSegment : false
+    )
   }
 
   const files = await listWorkspaceJSONLFiles(slug)

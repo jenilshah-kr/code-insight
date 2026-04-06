@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs/promises'
 import path from 'path'
-import os from 'os'
-import { loadMemories } from '@/common/helpers/data-reader'
+import { loadMemories, DATA_DIR } from '@/common/helpers/data-reader'
 
 export const dynamic = 'force-dynamic'
-
-const DATA_DIR = path.join(os.homedir(), '.claude')
 
 export async function GET() {
   const memories = await loadMemories()

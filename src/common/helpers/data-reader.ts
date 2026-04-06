@@ -30,7 +30,7 @@ export async function resolveWorkspacePath(slug: string): Promise<string> {
   return decodeSlug(slug)
 }
 
-const DATA_DIR = path.join(os.homedir(), '.claude')
+export const DATA_DIR = path.join(os.homedir(), '.claude')
 
 export function dataPath(...segments: string[]): string {
   return path.join(DATA_DIR, ...segments)
@@ -422,7 +422,8 @@ async function buildPlanProjectMap(): Promise<Map<string, string>> {
               const msg = JSON.parse(line)
               if (msg.type === 'tool_use' && msg.name === 'Write') {
                 const fp: string = msg.input?.file_path ?? ''
-                if (fp.includes('/.claude/plans/')) {
+                const _plansMarker = path.join('.claude', 'plans')
+              if (path.normalize(fp).includes(_plansMarker)) {
                   const planName = path.basename(fp, '.md')
                   if (!map.has(planName)) map.set(planName, slug)
                 }
@@ -451,7 +452,7 @@ export async function loadPlans(): Promise<PlanRecord[]> {
         ])
         const planName = f.replace(/\.md$/, '')
         const slug = planProjectMap.get(planName) ?? null
-        const project = slug ? decodeSlug(slug).split('/').filter(Boolean).pop() ?? null : null
+        const project = slug ? (path.basename(decodeSlug(slug)) || null) : null
         results.push({
           path: fullPath,
           name: planName,

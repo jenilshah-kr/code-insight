@@ -12,8 +12,8 @@ function truncate(s: string, n = 80): string {
 function getToolArg(tool: ToolInvocation): string {
   const inp = tool.input ?? {}
   if (inp.command) return String(inp.command).slice(0, 60)
-  if (inp.file_path) return String(inp.file_path).split('/').slice(-2).join('/')
-  if (inp.path) return String(inp.path).split('/').slice(-2).join('/')
+  if (inp.file_path) { const parts = String(inp.file_path).split(/[\\/]/).filter(Boolean); return parts.slice(-2).join('/') }
+  if (inp.path) { const parts = String(inp.path).split(/[\\/]/).filter(Boolean); return parts.slice(-2).join('/') }
   if (inp.pattern) return String(inp.pattern).slice(0, 60)
   if (inp.query) return String(inp.query).slice(0, 60)
   if (inp.url) return String(inp.url).slice(0, 60)

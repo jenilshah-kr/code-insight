@@ -1,19 +1,38 @@
+import path from 'path'
+
 // ─── Slug / Path helpers ─────────────────────────────────────────────────────
 
 /**
- * Decode a project directory slug back to a filesystem path.
- * e.g. "-Users-foo-bar-myproject" → "/Users/foo/bar/myproject"
+ * Decode a project directory slug back to a native filesystem path.
+ *
+ * Unix slugs:    "-Users-foo-myproject"    →  "/Users/foo/myproject"
+ * Windows slugs: "-C--Users-foo-myproject" →  "C:\Users\foo\myproject"
  */
 export function decodeSlug(slug: string): string {
-  // Slugs start with a leading dash representing the root /
+  if (process.platform === 'win32') {
+    // Windows slug format: leading dash + drive letter + double-dash + rest
+    // e.g. "-C--Users-foo-bar" comes from "C:\Users\foo\bar"
+    const winMatch = slug.match(/^-([A-Za-z])--(.*)$/)
+    if (winMatch) {
+      return `${winMatch[1].toUpperCase()}:\\${winMatch[2].replace(/-/g, '\\')}`
+    }
+    return slug.replace(/-/g, '\\')
+  }
+  // Unix: leading dash represents root '/', all dashes become '/'
   return slug.replace(/-/g, '/')
 }
 
 /**
- * Encode a filesystem path to the slug format used by Claude Code.
+ * Encode a native filesystem path to the slug format used by Claude Code.
+ *
+ * "/Users/foo/myproject"   →  "-Users-foo-myproject"
+ * "C:\Users\foo\myproject" →  "-C--Users-foo-myproject"
  */
-export function encodeSlug(path: string): string {
-  return path.replace(/\//g, '-')
+export function encodeSlug(filePath: string): string {
+  if (process.platform === 'win32') {
+    return '-' + filePath.replace(/\\/g, '-').replace(/:/g, '-')
+  }
+  return filePath.replace(/\//g, '-')
 }
 
 /**
@@ -33,7 +52,7 @@ export function workspaceShortPath(projectPath: string): string {
   if (!projectPath) return 'Unknown'
   const parts = projectPath.split(/[\\/]/).filter(Boolean)
   if (parts.length <= 2) return projectPath
-  return `.../${parts.slice(-2).join('/')}`
+  return `...${path.sep}${parts.slice(-2).join(path.sep)}`
 }
 
 // ─── Number formatters ───────────────────────────────────────────────────────
