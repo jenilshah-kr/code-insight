@@ -71,7 +71,7 @@ async function _compileWorkspaceList() {
     const outputTokens = sessionList.reduce((s, m) => s + (m.output_tokens ?? 0), 0)
 
     const estimatedCost = sessionList.reduce((sum, s) => {
-      return sum + calcCostFromUsage('claude-opus-4-6', {
+      return sum + calcCostFromUsage(s.model ?? 'claude-opus-4-6', {
         input_tokens: s.input_tokens ?? 0,
         output_tokens: s.output_tokens ?? 0,
         cache_creation_input_tokens: s.cache_creation_input_tokens ?? 0,
@@ -190,7 +190,7 @@ export async function compileWorkspaceDetail(slug: string) {
     const enrich = sessionMeta.get(s.session_id) ?? {}
     return {
       ...s,
-      estimated_cost: calcCostFromUsage('claude-opus-4-6', {
+      estimated_cost: calcCostFromUsage(s.model ?? 'claude-opus-4-6', {
         input_tokens: s.input_tokens ?? 0,
         output_tokens: s.output_tokens ?? 0,
         cache_creation_input_tokens: s.cache_creation_input_tokens ?? 0,
