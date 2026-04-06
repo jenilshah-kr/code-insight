@@ -1,0 +1,68 @@
+{
+  "name": "code-insight",
+  "version": "1.0.0",
+  "description": "Code Insight — AI developer analytics dashboard for Kroger Engineering",
+  "author": "Kroger Technology",
+  "license": "UNLICENSED",
+  "homepage": "",
+  "repository": {},
+  "keywords": [
+    "kroger",
+    "dashboard",
+    "analytics",
+    "ai-dev"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "code-insight": "bin/cli.js"
+  },
+  "files": [
+    "bin",
+    "app",
+    "components",
+    "lib",
+    "types",
+    "public",
+    "next.config.*",
+    "tsconfig.json",
+    "tailwind.config.*",
+    "postcss.config.*",
+    "components.json"
+  ],
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
+    "jszip": "^3.10.1",
+    "lightningcss": "^1.32.0",
+    "lightningcss-darwin-arm64": "^1.32.0",
+    "lucide-react": "^0.575.0",
+    "next": "16.1.6",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "^3.7.0",
+    "swr": "^2.4.1",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "shadcn": "^3.8.5"
+  }
+}

@@ -1,0 +1,171 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background:       var(--background);
+  --color-foreground:       var(--foreground);
+  --color-card:             var(--card);
+  --color-card-foreground:  var(--card-foreground);
+  --color-muted:            var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border:           var(--border);
+  --color-primary:          var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive:      var(--destructive);
+  --color-sidebar:          var(--sidebar);
+  --color-sidebar-border:   var(--sidebar-border);
+  --color-sidebar-accent:   var(--sidebar-accent);
+  --color-chart-1:          var(--chart-1);
+  --color-chart-2:          var(--chart-2);
+  --color-chart-3:          var(--chart-3);
+  --color-chart-4:          var(--chart-4);
+  --font-display: var(--font-syne), system-ui, sans-serif;
+  --font-mono:    var(--font-geist-mono), monospace;
+}
+
+:root {
+  /* Light theme */
+  --background:         #f8fafc;
+  --foreground:         #0f172a;
+  --card:               #ffffff;
+  --card-foreground:    #0f172a;
+  --muted:              #f1f5f9;
+  --muted-foreground:   #64748b;
+  --border:             #e2e8f0;
+  --primary:            #d97706;
+  --primary-foreground: #ffffff;
+  --destructive:        #ef4444;
+  --sidebar:            #1e293b;
+  --sidebar-border:     #334155;
+  --sidebar-accent:     #334155;
+  --chart-1:            #3b82f6;
+  --chart-2:            #34d399;
+  --chart-3:            #f59e0b;
+  --chart-4:            #a78bfa;
+
+  /* Metric semantic colors — light: saturated for contrast on #f8fafc */
+  --metric-messages:    #b45309;  /* amber-700: warm, primary KPI */
+  --metric-sessions:    #1d4ed8;  /* blue-700: systematic, reliable */
+  --metric-period:      #475569;  /* slate-600: secondary/temporal, muted */
+  --metric-tokens:      #6d28d9;  /* violet-700: computational depth */
+  --metric-projects:    #047857;  /* emerald-700: organizational growth */
+  --metric-storage:     #64748b;  /* slate-500: infrastructure, neutral */
+
+  /* Accent label colors — 600-700 series for contrast on light backgrounds */
+  --label-blue:    #1d4ed8;  /* blue-700:    8.6:1 vs white */
+  --label-red:     #dc2626;  /* red-600:     5.9:1 vs white */
+  --label-violet:  #6d28d9;  /* violet-700:  7.0:1 vs white */
+  --label-emerald: #047857;  /* emerald-700: 7.0:1 vs white */
+  --label-amber:   #b45309;  /* amber-700:   4.6:1 vs white */
+  --label-sky:     #0369a1;  /* sky-700:     6.4:1 vs white */
+  --label-orange:  #c2410c;  /* orange-700:  5.3:1 vs white */
+  --label-gray:    #374151;  /* gray-700:    8.0:1 vs white */
+  --label-green:   #15803d;  /* green-700:   5.2:1 vs white */
+}
+
+.dark {
+  --background:         #060c18;
+  --foreground:         #e2eaf4;
+  --card:               #0d1627;
+  --card-foreground:    #e2eaf4;
+  --muted:              #111c30;
+  --muted-foreground:   #7a92b0;
+  --border:             #1e2d45;
+  --primary:            #fbbf24;
+  --primary-foreground: #040d1e;
+  --destructive:        #f87171;
+  --sidebar:            #040d1e;
+  --sidebar-border:     #162035;
+  --sidebar-accent:     #0d1627;
+  --chart-1:            #60a5fa;
+  --chart-2:            #34d399;
+  --chart-3:            #fbbf24;
+  --chart-4:            #a78bfa;
+
+  /* Metric semantic colors — dark: bright, high contrast on #060c18 */
+  --metric-messages:    #fbbf24;  /* amber-400: warm beacon, primary KPI */
+  --metric-sessions:    #60a5fa;  /* blue-400: clear and structural */
+  --metric-period:      #7a92b0;  /* muted-foreground: softer secondary */
+  --metric-tokens:      #a78bfa;  /* violet-400: electric, computational */
+  --metric-projects:    #34d399;  /* emerald-400: fresh, organizational */
+  --metric-storage:     #94a3b8;  /* slate-400: neutral infrastructure */
+
+  /* Accent label colors — 400 series for contrast on dark backgrounds */
+  --label-blue:    #60a5fa;
+  --label-red:     #f87171;
+  --label-violet:  #a78bfa;
+  --label-emerald: #34d399;
+  --label-amber:   #fbbf24;
+  --label-sky:     #38bdf8;
+  --label-orange:  #fb923c;
+  --label-gray:    #9ca3af;
+  --label-green:   #4ade80;
+}
+
+* {
+  box-sizing: border-box;
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-mono), monospace;
+}
+
+/* ─── Custom Utilities ──────────────────────────────────────────────────────── */
+
+.data-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  padding: 1rem;
+}
+
+.section-label {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.stat-amber {
+  color: var(--label-amber);
+}
+
+.stat-green {
+  color: var(--label-emerald);
+}
+
+.stat-blue {
+  color: var(--label-blue);
+}
+
+.font-display {
+  font-family: var(--font-syne), system-ui, sans-serif;
+}
+
+/* Scrollbar hide */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Animations ────────────────────────────────────────────────────────────── */
+
+@keyframes navPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
