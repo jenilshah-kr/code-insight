@@ -75,6 +75,64 @@ function getToolName(value: unknown): string | null {
   return value
 }
 
+function readWorkspaceValue(raw: string, key: string): string | undefined {
+  const line = raw.split(/\r?\n/).find(entry => entry.startsWith(`${key}:`))
+  if (!line) return undefined
+  const value = line.replace(new RegExp(`^${key}:\\s*`), '').trim()
+  return value || undefined
+}
+
+interface CopilotWorkspaceContext {
+  projectPath: string
+  gitBranch?: string
+  repository?: string
+  summary?: string
+  version?: string
+}
+
+async function loadCopilotWorkspaceContext(sessionDir: string): Promise<CopilotWorkspaceContext> {
+  const events = await readEventsJsonl(path.join(sessionDir, 'events.jsonl'))
+  const startEvent = events.find(event => event.type === 'session.start')
+  const startData = (startEvent?.data ?? {}) as Record<string, unknown>
+  const context = (startData.context ?? {}) as Record<string, unknown>
+
+  let projectPath = typeof context.gitRoot === 'string'
+    ? context.gitRoot
+    : typeof context.cwd === 'string'
+      ? context.cwd
+      : ''
+  let gitBranch = typeof context.branch === 'string' ? context.branch : undefined
+  let repository = typeof context.repository === 'string' ? context.repository : undefined
+  let summary: string | undefined
+  const version = typeof startData.copilotVersion === 'string' ? startData.copilotVersion : undefined
+
+  try {
+    const raw = await fs.readFile(path.join(sessionDir, 'workspace.yaml'), 'utf-8')
+    projectPath ||= readWorkspaceValue(raw, 'git_root')
+      ?? readWorkspaceValue(raw, 'cwd')
+      ?? ''
+    gitBranch ||= readWorkspaceValue(raw, 'branch')
+    repository ||= readWorkspaceValue(raw, 'repository')
+    summary ||= readWorkspaceValue(raw, 'summary')
+  } catch {
+    // Workspace metadata is optional for older or partial sessions.
+  }
+
+  return {
+    projectPath,
+    gitBranch,
+    repository,
+    summary,
+    version,
+  }
+}
+
+function getCopilotPlanProject(context: CopilotWorkspaceContext): string | null {
+  if (context.projectPath) return workspaceDisplayName(context.projectPath)
+  if (context.repository) return context.repository.split('/').pop() ?? context.repository
+  return context.summary ?? null
+}
+
 function isTaskLikeTool(toolName: string): boolean {
   return ['task', 'task_complete', 'read_agent', 'list_agents', 'write_agent'].includes(toolName)
 }
@@ -104,14 +162,16 @@ async function parseCopilotSession(sessionDir: string): Promise<SessionInfo | nu
   const events = await readEventsJsonl(eventsPath)
   if (events.length === 0) return null
 
-  let projectPath = ''
+  const workspaceContext = await loadCopilotWorkspaceContext(sessionDir)
+
+  let projectPath = workspaceContext.projectPath
   let startTime = ''
   let lastTime = ''
   let firstPrompt = ''
   let assistantCount = 0
   let userCount = 0
-  let version: string | undefined
-  let gitBranch: string | undefined
+  let version: string | undefined = workspaceContext.version
+  let gitBranch: string | undefined = workspaceContext.gitBranch
   let currentModel: string | undefined
   let premiumRequests = 0
   let inputTokens = 0
@@ -243,17 +303,6 @@ async function parseCopilotSession(sessionDir: string): Promise<SessionInfo | nu
       }
       default:
         break
-    }
-  }
-
-  if (!projectPath) {
-    const workspacePath = path.join(sessionDir, 'workspace.yaml')
-    try {
-      const raw = await fs.readFile(workspacePath, 'utf-8')
-      const cwdLine = raw.split(/\r?\n/).find(line => line.startsWith('cwd:'))
-      if (cwdLine) projectPath = cwdLine.replace(/^cwd:\s*/, '').trim()
-    } catch {
-      projectPath = ''
     }
   }
 
@@ -389,12 +438,13 @@ export async function loadCopilotPlans(): Promise<PlanRecord[]> {
         fs.readFile(planPath, 'utf-8'),
         fs.stat(planPath),
       ])
+      const workspaceContext = await loadCopilotWorkspaceContext(sessionDir)
       results.push({
         path: planPath,
         name: path.basename(sessionDir),
         content,
         mtime: stat.mtime.toISOString(),
-        project: null,
+        project: getCopilotPlanProject(workspaceContext),
       })
     } catch {
       // ignore unreadable plan

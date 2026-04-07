@@ -11,6 +11,7 @@ const fetcher = (url: string) =>
   fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
 
 interface PlanRecord {
+  path: string
   name: string
   content: string
   mtime: string
@@ -224,6 +225,7 @@ export default function PlansPage() {
   const filtered = plans.filter(p =>
     !search ||
     p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.project?.toLowerCase().includes(search.toLowerCase()) ||
     p.content.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -263,7 +265,7 @@ export default function PlansPage() {
               <div className="flex-1 border border-border rounded-lg bg-card w-full focus-within:border-primary/40 transition-colors">
                 <input
                   className="w-full bg-transparent px-4 py-2.5 text-sm font-mono text-foreground placeholder-muted-foreground/50 outline-none"
-                  placeholder="search plans by name or content..."
+                  placeholder="search plans by name, project, or content..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                 />
@@ -286,12 +288,12 @@ export default function PlansPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {filtered.map(plan => (
-                  <PlanCard key={plan.name} plan={plan} />
-                ))}
-              </div>
-            )}
+                <div className="space-y-3">
+                  {filtered.map(plan => (
+                    <PlanCard key={plan.path} plan={plan} />
+                  ))}
+                </div>
+              )}
           </>
         )}
       </div>

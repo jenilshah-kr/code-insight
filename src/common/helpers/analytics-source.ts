@@ -95,7 +95,7 @@ export function getAnalyticsCapabilities(source: AnalyticsSource): SourceCapabil
       history: true,
       settings: true,
       costs: false,
-      plans: false,
+      plans: true,
       todos: false,
       memory: false,
     }

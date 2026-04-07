@@ -6,9 +6,6 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   const source = getAnalyticsSourceFromRequest(req)
-  if (source === 'copilot') {
-    return NextResponse.json({ error: 'Plans are not supported for Copilot analytics yet' }, { status: 501 })
-  }
   const plans = await loadPlansForSource(source)
   return NextResponse.json({ plans })
 }
