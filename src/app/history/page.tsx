@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
+import { getAnalyticsHistoryPath } from '@/common/helpers/analytics-source'
 import type { CommandRecord } from '@/common/types/models'
-
-const fetcher = (url: string) =>
-  fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
 
 function formatTime(ts: number) {
   const d = new Date(ts)
@@ -24,9 +23,13 @@ function projectName(p: string) {
 const PAGE_LIMIT = 50
 
 export default function HistoryPage() {
-  const { data, error, isLoading } = useSWR<{ history: CommandRecord[] }>(
-    '/api/history?limit=2000', fetcher, { refreshInterval: 30_000 }
+  const { source } = useAnalyticsSource()
+  const historyPath = getAnalyticsHistoryPath(source)
+  const { data, error, isLoading } = useAnalyticsSWR<{ history: CommandRecord[] }>(
+    '/api/history?limit=2000',
+    { refreshInterval: 30_000 }
   )
+  const showLoading = isLoading && !data
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
 
@@ -50,10 +53,10 @@ export default function HistoryPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="claude-code-analytics · history" subtitle="~/.claude/history.jsonl" />
+      <PageHeader title="claude-code-analytics · history" subtitle={historyPath} />
       <div className="p-4 md:p-6 space-y-4">
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
-        {isLoading && (
+        {showLoading && (
           <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-14 bg-muted rounded animate-pulse" />
@@ -78,7 +81,7 @@ export default function HistoryPage() {
 
             {pageEntries.length === 0 ? (
               <p className="text-muted-foreground/60 text-sm font-mono text-center py-12">
-                {(data.history?.length ?? 0) === 0 ? 'No history found in ~/.claude/history.jsonl' : 'No entries match your search.'}
+                {(data.history?.length ?? 0) === 0 ? `No history found in ${historyPath}` : 'No entries match your search.'}
               </p>
             ) : (
               <>

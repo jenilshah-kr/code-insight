@@ -1,11 +1,10 @@
 'use client'
 
-import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
+import { getAnalyticsSettingsPath } from '@/common/helpers/analytics-source'
 import type { SkillInfo, PluginInfo } from '@/common/helpers/data-reader'
-
-const fetcher = (url: string) =>
-  fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
 
 function formatBytes(b: number) {
   if (b >= 1_073_741_824) return (b / 1_073_741_824).toFixed(2) + ' GB'
@@ -71,19 +70,22 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function SettingsPage() {
-  const { data, error, isLoading } = useSWR<{
+  const { source, dataRoot } = useAnalyticsSource()
+  const settingsPath = getAnalyticsSettingsPath(source)
+  const { data, error, isLoading } = useAnalyticsSWR<{
     settings: Record<string, unknown>
     storageBytes: number
     skills: SkillInfo[]
     plugins: PluginInfo[]
-  }>('/api/settings', fetcher, { refreshInterval: 5_000 })
+  }>('/api/settings', { refreshInterval: 5_000 })
+  const showLoading = isLoading && !data
 
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="claude-code-analytics · settings" subtitle="~/.claude/settings.json" />
+      <PageHeader title="claude-code-analytics · settings" subtitle={settingsPath} />
       <div className="p-4 md:p-6 space-y-6">
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
-        {isLoading && (
+        {showLoading && (
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="h-32 bg-muted rounded animate-pulse" />
@@ -97,13 +99,13 @@ export default function SettingsPage() {
                 <span className="text-primary text-2xl font-mono font-bold">
                   {formatBytes(data.storageBytes)}
                 </span>
-                <span className="text-muted-foreground text-sm font-mono">used by ~/.claude/</span>
+                <span className="text-muted-foreground text-sm font-mono">used by {dataRoot}/</span>
               </div>
             </Section>
 
             <Section title="Settings">
               {Object.keys(data.settings).length === 0 ? (
-                <p className="text-muted-foreground/60 text-sm font-mono">No settings found in ~/.claude/settings.json</p>
+                <p className="text-muted-foreground/60 text-sm font-mono">No settings found in {settingsPath}</p>
               ) : (
                 <div className="font-mono text-sm leading-relaxed overflow-x-auto">
                   <JsonValue value={data.settings} />
@@ -136,7 +138,11 @@ export default function SettingsPage() {
 
             <Section title={`Skills (${data.skills.length})`}>
               {data.skills.length === 0 ? (
-                <p className="text-muted-foreground/60 text-sm font-mono">No skills found in ~/.claude/skills/</p>
+                <p className="text-muted-foreground/60 text-sm font-mono">
+                  {source === 'copilot'
+                    ? 'Copilot CLI does not currently expose reusable skills metadata here.'
+                    : `No skills found in ${dataRoot}/skills/`}
+                </p>
               ) : (
                 <div className="grid gap-2">
                   {data.skills.map(skill => (

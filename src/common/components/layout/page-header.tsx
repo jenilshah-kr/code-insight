@@ -4,6 +4,15 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { mutate } from 'swr'
 import { Star, RefreshCw } from 'lucide-react'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import {
+  getAnalyticsDataRoot,
+  getAnalyticsHistoryPath,
+  getAnalyticsMemoryPath,
+  getAnalyticsPlansPath,
+  getAnalyticsSettingsPath,
+  getAnalyticsTodosPath,
+} from '@/common/helpers/analytics-source'
 
 interface PageHeaderProps {
   title: string
@@ -27,10 +36,10 @@ function formatTimestamp(d: Date) {
 export function PageHeader({ title, subtitle, showStarButton = false }: PageHeaderProps) {
   const router = useRouter()
   const [refreshing, setRefreshing] = useState(false)
-  const [now, setNow] = useState<string>('')
+  const [now, setNow] = useState<string>(() => formatTimestamp(new Date()))
+  const { source, productLabel, label } = useAnalyticsSource()
 
   useEffect(() => {
-    setNow(formatTimestamp(new Date()))
     const id = setInterval(() => setNow(formatTimestamp(new Date())), 1000)
     return () => clearInterval(id)
   }, [])
@@ -43,9 +52,18 @@ export function PageHeader({ title, subtitle, showStarButton = false }: PageHead
   }
 
   const displayTime = now || '—'
+  const sourceTitlePrefix = source === 'claude' ? 'claude-code-analytics' : 'copilot-cli-analytics'
+  const resolvedTitle = title.replace(/^claude-code-analytics/i, sourceTitlePrefix)
+  const resolvedSubtitle = subtitle
+    ?.replaceAll('~/.claude/history.jsonl', getAnalyticsHistoryPath(source))
+    .replaceAll('~/.claude/settings.json', getAnalyticsSettingsPath(source))
+    .replaceAll('~/.claude/projects/*/memory/', getAnalyticsMemoryPath(source))
+    .replaceAll('~/.claude/plans/', getAnalyticsPlansPath(source))
+    .replaceAll('~/.claude/todos/', getAnalyticsTodosPath(source))
+    .replaceAll('~/.claude/', `${getAnalyticsDataRoot(source)}/`)
 
   // Split title: first word large, rest smaller — or show as-is
-  const words = title.split(/[-_\s]/)
+  const words = resolvedTitle.split(/[-_\s]/)
   const firstWord = words[0]
   const restWords = words.slice(1).join('-')
 
@@ -69,7 +87,7 @@ export function PageHeader({ title, subtitle, showStarButton = false }: PageHead
               style={{ background: 'var(--primary)', opacity: 0.6 }}
             />
             <span className="section-label" style={{ opacity: 0.7 }}>
-              Kroger Engineering · Claude Code Analytics
+              Kroger Engineering · {productLabel}
             </span>
           </div>
 
@@ -88,7 +106,7 @@ export function PageHeader({ title, subtitle, showStarButton = false }: PageHead
 
           {/* Subtitle + timestamp row */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-0.5">
-            {subtitle && (
+            {resolvedSubtitle && (
               <span
                 style={{
                   fontFamily: 'var(--font-geist-mono), monospace',
@@ -97,7 +115,7 @@ export function PageHeader({ title, subtitle, showStarButton = false }: PageHead
                   letterSpacing: '0.04em',
                 }}
               >
-                {subtitle}
+                {resolvedSubtitle}
               </span>
             )}
             <span
@@ -115,6 +133,17 @@ export function PageHeader({ title, subtitle, showStarButton = false }: PageHead
                 style={{ background: 'var(--chart-2)', boxShadow: '0 0 4px rgba(52,211,153,0.4)' }}
               />
               {displayTime}
+            </span>
+            <span
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded border border-border bg-muted/50"
+              style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 11,
+                color: 'var(--muted-foreground)',
+                letterSpacing: '0.03em',
+              }}
+            >
+              {label}
             </span>
           </div>
         </div>

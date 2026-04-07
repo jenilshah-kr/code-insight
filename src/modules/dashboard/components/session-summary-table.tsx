@@ -1,21 +1,10 @@
 'use client'
 
-import useSWR from 'swr'
 import Link from 'next/link'
-import { formatRelativeDate, workspaceDisplayName } from '@/common/helpers/formatters'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
+import { formatRelativeDate, workspaceDisplayName, shortConversationModelName } from '@/common/helpers/formatters'
 import type { ConversationWithFacet } from '@/common/types/models'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
-
-function shortModel(m: string | undefined): string {
-  if (!m) return '—'
-  if (m.includes('opus-4-6'))   return 'Opus 4.6'
-  if (m.includes('opus-4-5'))   return 'Opus 4.5'
-  if (m.includes('sonnet-4-6')) return 'Sonnet 4.6'
-  if (m.includes('sonnet-4-5')) return 'Sonnet 4.5'
-  if (m.includes('haiku-4-5'))  return 'Haiku 4.5'
-  return m.split('-').slice(-2).join(' ')
-}
 
 function getLastActivityMs(s: ConversationWithFacet): number {
   return new Date(s.start_time).getTime() + (s.duration_minutes ?? 0) * 60_000
@@ -36,9 +25,23 @@ function getStatus(s: ConversationWithFacet): 'active' | 'inactive' {
 }
 
 export function SessionSummaryTable() {
-  const { data } = useSWR<{ sessions: ConversationWithFacet[] }>('/api/sessions', fetcher, { refreshInterval: 5_000 })
+  const { capabilities } = useAnalyticsSource()
+  const { data, error, isLoading } = useAnalyticsSWR<{ sessions: ConversationWithFacet[] }>('/api/sessions', {
+    refreshInterval: 5_000,
+  })
+  const showLoading = isLoading && !data
 
   const recent = (data?.sessions ?? []).slice(0, 10)
+  if (error) return <p className="text-destructive text-sm text-center py-4">Error: {String(error)}</p>
+  if (showLoading) {
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="h-10 bg-muted rounded animate-pulse" />
+        ))}
+      </div>
+    )
+  }
   if (recent.length === 0) return <p className="text-muted-foreground/50 text-sm text-center py-4">No conversations yet</p>
 
   return (
@@ -73,20 +76,29 @@ export function SessionSummaryTable() {
             return (
               <tr key={s.session_id} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
                 <td className="py-2 font-mono">
-                  <Link
-                    href={`/sessions/${s.session_id}`}
-                    className="text-primary hover:underline"
-                    title={s.session_id}
-                  >
-                    {s.session_id.slice(0, 8)}
-                  </Link>
+                  {capabilities.sessionDetail ? (
+                    <Link
+                      href={`/sessions/${s.session_id}`}
+                      className="text-primary hover:underline"
+                      title={s.session_id}
+                    >
+                      {s.session_id.slice(0, 8)}
+                    </Link>
+                  ) : (
+                    <span
+                      className="text-muted-foreground"
+                      title="Session detail is not available in Copilot mode"
+                    >
+                      {s.session_id.slice(0, 8)}
+                    </span>
+                  )}
                 </td>
                 <td className="py-2 max-w-[160px]">
                   <span className="truncate block text-foreground">
                     {workspaceDisplayName(s.project_path ?? '')}
                   </span>
                 </td>
-                <td className="py-2 text-muted-foreground">{shortModel(s.model)}</td>
+                <td className="py-2 text-muted-foreground">{shortConversationModelName(s)}</td>
                 <td className="py-2 text-right text-muted-foreground tabular-nums">{msgCount.toLocaleString()}</td>
                 <td className="py-2 text-right text-muted-foreground whitespace-nowrap">
                   {formatRelativeDate(getLastActivityStr(s))}

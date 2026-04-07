@@ -6,6 +6,7 @@ import {
   resolveWorkspacePath,
 } from '@/common/helpers/data-reader'
 import { getCachedSessions, getCachedDerived } from '@/common/helpers/session-cache'
+import type { AnalyticsSource } from '@/common/helpers/analytics-source'
 import { calcCostFromUsage } from '@/common/helpers/rates'
 import { workspaceDisplayName, encodeSlug } from '@/common/helpers/formatters'
 import type { WorkspaceSummary, ConversationWithFacet } from '@/common/types/models'
@@ -13,20 +14,23 @@ import type { WorkspaceSummary, ConversationWithFacet } from '@/common/types/mod
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyLine = Record<string, any>
 
-export function compileWorkspaceList() {
-  return getCachedDerived('workspace-list', _compileWorkspaceList)
+export function compileWorkspaceList(source: AnalyticsSource = 'claude') {
+  return getCachedDerived('workspace-list', () => _compileWorkspaceList(source), source)
 }
 
-async function _compileWorkspaceList() {
-  const [sessions, slugDirs] = await Promise.all([getCachedSessions(), listWorkspaceSlugs()])
+async function _compileWorkspaceList(source: AnalyticsSource) {
+  const sessions = await getCachedSessions(source)
+  const slugDirs = source === 'claude' ? await listWorkspaceSlugs() : []
 
   const pathToSlugMap = new Map<string, string>()
-  await Promise.all(
-    slugDirs.map(async (slug) => {
-      const resolved = await resolveWorkspacePath(slug)
-      pathToSlugMap.set(resolved, slug)
-    })
-  )
+  if (source === 'claude') {
+    await Promise.all(
+      slugDirs.map(async (slug) => {
+        const resolved = await resolveWorkspacePath(slug)
+        pathToSlugMap.set(resolved, slug)
+      })
+    )
+  }
 
   const byPath = new Map<string, typeof sessions>()
   for (const s of sessions) {
@@ -36,22 +40,24 @@ async function _compileWorkspaceList() {
   }
 
   const slugBranches = new Map<string, Set<string>>()
-  await Promise.all(
-    slugDirs.map(async (slug) => {
-      const files = await listWorkspaceJSONLFiles(slug)
-      const branches = new Set<string>()
-      await Promise.all(
-        files.map(async (f) => {
-          await streamJSONLLines(f, (line: AnyLine) => {
-            if (line.gitBranch && line.gitBranch !== 'HEAD') {
-              branches.add(line.gitBranch)
-            }
+  if (source === 'claude') {
+    await Promise.all(
+      slugDirs.map(async (slug) => {
+        const files = await listWorkspaceJSONLFiles(slug)
+        const branches = new Set<string>()
+        await Promise.all(
+          files.map(async (f) => {
+            await streamJSONLLines(f, (line: AnyLine) => {
+              if (line.gitBranch && line.gitBranch !== 'HEAD') {
+                branches.add(line.gitBranch)
+              }
+            })
           })
-        })
-      )
-      slugBranches.set(slug, branches)
-    })
-  )
+        )
+        slugBranches.set(slug, branches)
+      })
+    )
+  }
 
   const projects: WorkspaceSummary[] = []
 
@@ -69,15 +75,18 @@ async function _compileWorkspaceList() {
     const gitPushes = sessionList.reduce((s, m) => s + (m.git_pushes ?? 0), 0)
     const inputTokens = sessionList.reduce((s, m) => s + (m.input_tokens ?? 0), 0)
     const outputTokens = sessionList.reduce((s, m) => s + (m.output_tokens ?? 0), 0)
+    const premiumRequests = sessionList.reduce((s, m) => s + (m.premium_requests ?? 0), 0)
 
-    const estimatedCost = sessionList.reduce((sum, s) => {
-      return sum + calcCostFromUsage(s.model ?? 'claude-opus-4-6', {
-        input_tokens: s.input_tokens ?? 0,
-        output_tokens: s.output_tokens ?? 0,
-        cache_creation_input_tokens: s.cache_creation_input_tokens ?? 0,
-        cache_read_input_tokens: s.cache_read_input_tokens ?? 0,
-      })
-    }, 0)
+    const estimatedCost = source === 'claude'
+      ? sessionList.reduce((sum, s) => {
+        return sum + calcCostFromUsage(s.model ?? 'claude-opus-4-6', {
+          input_tokens: s.input_tokens ?? 0,
+          output_tokens: s.output_tokens ?? 0,
+          cache_creation_input_tokens: s.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: s.cache_read_input_tokens ?? 0,
+        })
+      }, 0)
+      : 0
 
     const languages: Record<string, number> = {}
     for (const s of sessionList) {
@@ -108,6 +117,7 @@ async function _compileWorkspaceList() {
       git_commits: gitCommits,
       git_pushes: gitPushes,
       estimated_cost: estimatedCost,
+      premium_requests: premiumRequests,
       input_tokens: inputTokens,
       output_tokens: outputTokens,
       languages,
@@ -137,6 +147,7 @@ async function _compileWorkspaceList() {
       git_commits: 0,
       git_pushes: 0,
       estimated_cost: 0,
+      premium_requests: 0,
       input_tokens: 0,
       output_tokens: 0,
       languages: {},
@@ -152,9 +163,11 @@ async function _compileWorkspaceList() {
   return { projects: projects.sort((a, b) => b.last_active.localeCompare(a.last_active)) }
 }
 
-export async function compileWorkspaceDetail(slug: string) {
-  const projectPath = await resolveWorkspacePath(slug)
-  const allSessions = await getCachedSessions()
+export async function compileWorkspaceDetail(slug: string, source: AnalyticsSource = 'claude') {
+  const allSessions = await getCachedSessions(source)
+  const projectPath = source === 'claude'
+    ? await resolveWorkspacePath(slug)
+    : allSessions.find(s => encodeSlug(s.project_path) === slug)?.project_path ?? slug
   let sessions = allSessions.filter(s => s.project_path === projectPath)
 
   if (sessions.length === 0) {
@@ -164,38 +177,58 @@ export async function compileWorkspaceDetail(slug: string) {
     )
   }
 
-  const files = await listWorkspaceJSONLFiles(slug)
   const branchTurns = new Map<string, number>()
   const sessionMeta = new Map<string, { slug?: string; version?: string; has_compaction?: boolean }>()
 
-  await Promise.all(
-    files.map(async (f) => {
-      const sessionId = path.basename(f, '.jsonl')
-      const meta: { slug?: string; version?: string; has_compaction?: boolean } = {}
+  if (source === 'claude') {
+    const files = await listWorkspaceJSONLFiles(slug)
+    await Promise.all(
+      files.map(async (f) => {
+        const sessionId = path.basename(f, '.jsonl')
+        const meta: { slug?: string; version?: string; has_compaction?: boolean } = {}
 
-      await streamJSONLLines(f, (line: AnyLine) => {
-        if (!meta.slug && line.slug) meta.slug = line.slug
-        if (!meta.version && line.version) meta.version = line.version
-        if (line.type === 'system' && line.subtype === 'compact_boundary') meta.has_compaction = true
-        if (line.gitBranch && line.gitBranch !== 'HEAD') {
-          branchTurns.set(line.gitBranch, (branchTurns.get(line.gitBranch) ?? 0) + 1)
-        }
+        await streamJSONLLines(f, (line: AnyLine) => {
+          if (!meta.slug && line.slug) meta.slug = line.slug
+          if (!meta.version && line.version) meta.version = line.version
+          if (line.type === 'system' && line.subtype === 'compact_boundary') meta.has_compaction = true
+          if (line.gitBranch && line.gitBranch !== 'HEAD') {
+            branchTurns.set(line.gitBranch, (branchTurns.get(line.gitBranch) ?? 0) + 1)
+          }
+        })
+
+        sessionMeta.set(sessionId, meta)
       })
-
-      sessionMeta.set(sessionId, meta)
-    })
-  )
+    )
+  } else {
+    for (const session of sessions) {
+      if (session.git_branch) {
+        branchTurns.set(
+          session.git_branch,
+          (branchTurns.get(session.git_branch) ?? 0)
+            + (session.assistant_message_count ?? 0)
+            + (session.user_message_count ?? 0)
+        )
+      }
+      sessionMeta.set(session.session_id, {
+        slug: session.slug,
+        version: session.version,
+        has_compaction: session.has_compaction,
+      })
+    }
+  }
 
   const enrichedSessions: ConversationWithFacet[] = sessions.map(s => {
     const enrich = sessionMeta.get(s.session_id) ?? {}
     return {
       ...s,
-      estimated_cost: calcCostFromUsage(s.model ?? 'claude-opus-4-6', {
-        input_tokens: s.input_tokens ?? 0,
-        output_tokens: s.output_tokens ?? 0,
-        cache_creation_input_tokens: s.cache_creation_input_tokens ?? 0,
-        cache_read_input_tokens: s.cache_read_input_tokens ?? 0,
-      }),
+      estimated_cost: source === 'claude'
+        ? calcCostFromUsage(s.model ?? 'claude-opus-4-6', {
+          input_tokens: s.input_tokens ?? 0,
+          output_tokens: s.output_tokens ?? 0,
+          cache_creation_input_tokens: s.cache_creation_input_tokens ?? 0,
+          cache_read_input_tokens: s.cache_read_input_tokens ?? 0,
+        })
+        : 0,
       slug: enrich.slug,
       version: enrich.version,
       has_compaction: enrich.has_compaction,

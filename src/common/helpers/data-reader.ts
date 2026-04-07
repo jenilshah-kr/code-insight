@@ -59,7 +59,30 @@ export async function loadSessionsFromJSONL(): Promise<SessionInfo[]> {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ModelAttribution = {
+  outputTokens: number
+  messageCount: number
+}
+
+function recordModelAttribution(
+  attributions: Record<string, ModelAttribution>,
+  model: string,
+  outputTokens: number
+) {
+  const existing = attributions[model] ?? { outputTokens: 0, messageCount: 0 }
+  existing.outputTokens += outputTokens
+  existing.messageCount += 1
+  attributions[model] = existing
+}
+
+function pickDominantModel(attributions: Record<string, ModelAttribution>): string | undefined {
+  return Object.entries(attributions)
+    .sort((a, b) => (
+      b[1].outputTokens - a[1].outputTokens
+      || b[1].messageCount - a[1].messageCount
+    ))[0]?.[0]
+}
+
 async function parseSessionFromFiles(
   filePaths: string[],
   sessionId: string,
@@ -76,7 +99,8 @@ async function parseSessionFromFiles(
   let cacheRead = 0
   let cacheWrite = 0
   let firstPrompt = ''
-  const modelOutputTokens: Record<string, number> = {}
+  const modelAttributions: Record<string, ModelAttribution> = {}
+  const rootModelAttributions: Record<string, ModelAttribution> = {}
   let hasTaskAgent = false
   let hasMcp = false
   let hasWebSearch = false
@@ -87,8 +111,10 @@ async function parseSessionFromFiles(
   let sessionGitBranch: string | undefined
   let hasCompaction = false
   let hasThinking = false
+  const rootSessionPath = path.join(dataPath('projects', slug), `${sessionId}.jsonl`)
 
   for (const filePath of filePaths) {
+    const isRootSessionFile = path.normalize(filePath) === path.normalize(rootSessionPath)
     try {
       const raw = await fs.readFile(filePath, 'utf-8')
       const lines = raw.split(/\r?\n/).filter(Boolean)
@@ -123,7 +149,8 @@ async function parseSessionFromFiles(
             const msg = (obj as { message?: { model?: string; usage?: Record<string, number>; content?: unknown[] } }).message
             if (msg?.model) {
               const out = msg.usage?.output_tokens ?? 0
-              modelOutputTokens[msg.model] = (modelOutputTokens[msg.model] ?? 0) + out
+              recordModelAttribution(modelAttributions, msg.model, out)
+              if (isRootSessionFile) recordModelAttribution(rootModelAttributions, msg.model, out)
             }
             if (msg?.usage) {
               inputTokens += msg.usage.input_tokens ?? 0
@@ -153,7 +180,8 @@ async function parseSessionFromFiles(
 
   if (!startTime) return null
 
-  const model = Object.entries(modelOutputTokens).sort((a, b) => b[1] - a[1])[0]?.[0]
+  const model = pickDominantModel(modelAttributions)
+  const primaryModel = pickDominantModel(rootModelAttributions) ?? model
 
   const start = new Date(startTime).getTime()
   const end = lastTime ? new Date(lastTime).getTime() : start
@@ -162,6 +190,7 @@ async function parseSessionFromFiles(
   return {
     session_id: sessionId,
     model,
+    primary_model: primaryModel,
     project_path: projectPath,
     start_time: startTime,
     duration_minutes: durationMinutes,
@@ -181,6 +210,7 @@ async function parseSessionFromFiles(
     tool_errors: 0,
     tool_error_categories: {},
     uses_task_agent: hasTaskAgent,
+    uses_plan_mode: (toolCounts.EnterPlanMode ?? 0) > 0,
     uses_mcp: hasMcp,
     uses_web_search: hasWebSearch,
     uses_web_fetch: hasWebFetch,
@@ -222,7 +252,10 @@ export async function loadAllSessionInfo(): Promise<SessionInfo[]> {
           try {
             const raw = await fs.readFile(path.join(dir, f), 'utf-8')
             const parsed = JSON.parse(raw) as SessionInfo
-            results.push(parsed)
+            results.push({
+              ...parsed,
+              primary_model: parsed.primary_model ?? parsed.model,
+            })
           } catch { /* skip malformed */ }
         })
     )
@@ -240,7 +273,11 @@ export async function loadSessionInfo(sessionId: string): Promise<SessionInfo | 
       dataPath('usage-data', 'session-meta', `${sessionId}.json`),
       'utf-8'
     )
-    return JSON.parse(raw) as SessionInfo
+    const parsed = JSON.parse(raw) as SessionInfo
+    return {
+      ...parsed,
+      primary_model: parsed.primary_model ?? parsed.model,
+    }
   } catch {
     return null
   }

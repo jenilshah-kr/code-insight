@@ -1,12 +1,14 @@
 import Link from 'next/link'
+import type { AnalyticsSource } from '@/common/helpers/analytics-source'
 import type { WorkspaceSummary } from '@/common/types/models'
 import { formatCost, formatDuration, formatRelativeDate } from '@/common/helpers/formatters'
 
 interface Props {
   project: WorkspaceSummary
+  source: AnalyticsSource
 }
 
-export function WorkspaceCard({ project: p }: Props) {
+export function WorkspaceCard({ project: p, source }: Props) {
   return (
     <Link
       href={`/projects/${p.slug}`}
@@ -18,7 +20,14 @@ export function WorkspaceCard({ project: p }: Props) {
           <p className="font-bold text-foreground truncate">{p.display_name}</p>
           <p className="text-muted-foreground/60 text-[12px] truncate font-mono">{p.project_path}</p>
         </div>
-        <span className="text-primary font-mono font-bold text-[15px] shrink-0">{formatCost(p.estimated_cost)}</span>
+        <div className="text-right shrink-0">
+          <p className="text-primary font-mono font-bold text-[15px]">
+            {source === 'claude' ? formatCost(p.estimated_cost) : (p.premium_requests ?? 0).toLocaleString()}
+          </p>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+            {source === 'claude' ? 'est. cost' : 'premium reqs'}
+          </p>
+        </div>
       </div>
 
       {/* Stats row */}

@@ -1,17 +1,15 @@
 'use client'
 
-import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
+import { getAnalyticsVersionHistoryLabel } from '@/common/helpers/analytics-source'
 import { InstrumentRankingChart } from '@/modules/instruments/components/instrument-ranking-chart'
 import { ServerPanel } from '@/modules/instruments/components/server-panel'
 import { AdoptionTable } from '@/modules/instruments/components/adoption-table'
 import { ReleaseHistoryTable } from '@/modules/instruments/components/release-history-table'
 import { GROUP_COLORS, GROUP_LABELS } from '@/common/helpers/tool-groups'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Cell, ResponsiveContainer } from 'recharts'
 import type { InstrumentAnalytics } from '@/common/types/models'
-
-const fetcher = (url: string) =>
-  fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -23,14 +21,18 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 export default function ToolsPage() {
-  const { data, error, isLoading } = useSWR<InstrumentAnalytics>('/api/tools', fetcher, { refreshInterval: 5_000 })
+  const { source } = useAnalyticsSource()
+  const { data, error, isLoading } = useAnalyticsSWR<InstrumentAnalytics>('/api/tools', {
+    refreshInterval: 5_000,
+  })
+  const showLoading = isLoading && !data
 
   return (
     <div className="flex flex-col min-h-screen">
       <PageHeader title="claude-code-analytics · tools & features" subtitle="every tool call, MCP server, and feature" />
       <div className="p-6 space-y-6">
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
-        {isLoading && (
+        {showLoading && (
           <div className="space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="h-32 bg-muted rounded animate-pulse" />
@@ -130,7 +132,7 @@ export default function ToolsPage() {
 
             {/* Version history */}
             {data.versions.length > 0 && (
-              <Card title="Claude Code Version History">
+              <Card title={getAnalyticsVersionHistoryLabel(source)}>
                 <ReleaseHistoryTable versions={data.versions} />
               </Card>
             )}

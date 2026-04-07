@@ -2,24 +2,15 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
 import { FeatureBadges } from './feature-badges'
-import { formatCost, formatTokens, formatDuration, formatDate, workspaceDisplayName } from '@/common/helpers/formatters'
+import { formatCost, formatDuration, formatDate, workspaceDisplayName, encodeSlug, getConversationModel, shortConversationModelName } from '@/common/helpers/formatters'
 import type { ConversationWithFacet } from '@/common/types/models'
 
 const PAGE_LIMIT = 25
 
-type SortField = 'start_time' | 'duration_minutes' | 'total_messages' | 'estimated_cost' | 'tool_calls' | 'model'
+type SortField = 'start_time' | 'duration_minutes' | 'total_messages' | 'estimated_cost' | 'premium_requests' | 'tool_calls' | 'model'
 
-function shortModel(m: string | undefined): string {
-  if (!m) return '—'
-  if (m.includes('opus-4-6'))   return 'Opus 4.6'
-  if (m.includes('opus-4-5'))   return 'Opus 4.5'
-  if (m.includes('sonnet-4-6')) return 'Sonnet 4.6'
-  if (m.includes('sonnet-4-5')) return 'Sonnet 4.5'
-  if (m.includes('haiku-4-5'))  return 'Haiku 4.5'
-  if (m.includes('haiku-4-6'))  return 'Haiku 4.6'
-  return m
-}
 type SortOrder = 'asc' | 'desc'
 
 interface Props {
@@ -47,6 +38,7 @@ function SortableHeader({
 }
 
 export function ConversationList({ sessions }: Props) {
+  const { source, capabilities } = useAnalyticsSource()
   const [sortKey, setSortKey] = useState<SortField>('start_time')
   const [sortDir, setSortDir] = useState<SortOrder>('desc')
   const [page, setPage] = useState(1)
@@ -74,7 +66,8 @@ export function ConversationList({ sessions }: Props) {
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       if (sortKey === 'model') {
-        const am = a.model ?? '', bm = b.model ?? ''
+        const am = getConversationModel(a) ?? ''
+        const bm = getConversationModel(b) ?? ''
         return sortDir === 'desc' ? bm.localeCompare(am) : am.localeCompare(bm)
       }
       let av: number, bv: number
@@ -159,7 +152,15 @@ export function ConversationList({ sessions }: Props) {
                 <th className="px-3 py-2 text-right"><SortableHeader label="Msgs" k="total_messages" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} /></th>
                 <th className="px-3 py-2 text-right"><SortableHeader label="Tools" k="tool_calls" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} /></th>
                 <th className="px-3 py-2 text-left"><SortableHeader label="Model" k="model" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} /></th>
-                <th className="px-3 py-2 text-right"><SortableHeader label="Cost" k="estimated_cost" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} /></th>
+                <th className="px-3 py-2 text-right">
+                  <SortableHeader
+                    label={source === 'claude' ? 'Cost' : 'Premium'}
+                    k={source === 'claude' ? 'estimated_cost' : 'premium_requests'}
+                    sortKey={sortKey}
+                    sortDir={sortDir}
+                    onSort={toggleSort}
+                  />
+                </th>
                 <th className="px-3 py-2 text-left"><span className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Flags</span></th>
               </tr>
             </thead>
@@ -167,8 +168,8 @@ export function ConversationList({ sessions }: Props) {
               {paginated.map((s, i) => {
                 const totalMsgs = (s.user_message_count ?? 0) + (s.assistant_message_count ?? 0)
                 const totalTools = Object.values(s.tool_counts ?? {}).reduce((sum, c) => sum + c, 0)
-                const totalTokens = (s.input_tokens ?? 0) + (s.output_tokens ?? 0)
                 const projectName = workspaceDisplayName(s.project_path ?? '')
+                const projectHref = s.project_path ? `/projects/${encodeSlug(s.project_path)}` : null
 
                 return (
                   <tr
@@ -179,13 +180,30 @@ export function ConversationList({ sessions }: Props) {
                       {formatDate(s.start_time)}
                     </td>
                     <td className="px-3 py-2 max-w-[200px]">
-                      <Link
-                        href={`/sessions/${s.session_id}`}
-                        className="text-foreground hover:text-primary transition-colors font-medium truncate block"
-                        title={s.project_path ?? ''}
-                      >
-                        {projectName}
-                      </Link>
+                      {capabilities.sessionDetail ? (
+                        <Link
+                          href={`/sessions/${s.session_id}`}
+                          className="text-foreground hover:text-primary transition-colors font-medium truncate block"
+                          title={s.project_path ?? ''}
+                        >
+                          {projectName}
+                        </Link>
+                      ) : projectHref && capabilities.projectDetail ? (
+                        <Link
+                          href={projectHref}
+                          className="text-foreground hover:text-primary transition-colors font-medium truncate block"
+                          title={s.project_path ?? ''}
+                        >
+                          {projectName}
+                        </Link>
+                      ) : (
+                        <span
+                          className="text-foreground font-medium truncate block"
+                          title="Session detail is not available in Copilot mode"
+                        >
+                          {projectName}
+                        </span>
+                      )}
                       {s.first_prompt && (
                         <p className="text-muted-foreground/60 truncate text-[12px]">
                           {s.first_prompt.slice(0, 60)}
@@ -202,10 +220,10 @@ export function ConversationList({ sessions }: Props) {
                       {totalTools.toLocaleString()}
                     </td>
                     <td className="px-3 py-2 text-left text-muted-foreground whitespace-nowrap text-[12px]">
-                      {shortModel(s.model)}
+                      {shortConversationModelName(s)}
                     </td>
                     <td className="px-3 py-2 text-right font-mono text-primary">
-                      {formatCost(s.estimated_cost)}
+                      {source === 'claude' ? formatCost(s.estimated_cost) : (s.premium_requests ?? 0).toLocaleString()}
                     </td>
                     <td className="px-3 py-2">
                       <FeatureBadges

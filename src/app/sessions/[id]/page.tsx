@@ -3,10 +3,11 @@
 import { use } from 'react'
 import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { SourceUnsupportedState } from '@/common/components/source-unsupported-state'
 import { DetailPanel } from '@/modules/conversations/components/replay/detail-panel'
 import { UserMessageCard, AssistantMessageCard } from '@/modules/conversations/components/replay/turn-blocks'
 import { UsageAccumulationChart } from '@/modules/conversations/components/replay/token-accumulation-chart'
-import { FeatureBadges } from '@/modules/conversations/components/feature-badges'
 import { formatCost, formatTokens, formatDuration, workspaceDisplayName } from '@/common/helpers/formatters'
 import type { PlaybackData, SessionInfo } from '@/common/types/models'
 
@@ -17,14 +18,32 @@ type ReplayResponse = PlaybackData
 
 export default function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const { capabilities } = useAnalyticsSource()
 
   const { data: replayData, error: replayError, isLoading: replayLoading } =
-    useSWR<ReplayResponse>(`/api/sessions/${id}/replay`, fetcher)
+    useSWR<ReplayResponse>(capabilities.sessionDetail ? `/api/sessions/${id}/replay` : null, fetcher)
 
   const { data: metaData } =
-    useSWR<{ session: SessionInfo & { estimated_cost: number } }>(`/api/sessions/${id}`, fetcher)
+    useSWR<{ session: SessionInfo & { estimated_cost: number } }>(
+      capabilities.sessionDetail ? `/api/sessions/${id}` : null,
+      fetcher
+    )
 
   const meta = metaData?.session
+
+  if (!capabilities.sessionDetail) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <PageHeader title="session replay" subtitle="source-specific session detail" />
+        <div className="p-6">
+          <SourceUnsupportedState
+            feature="Session replay"
+            detail="Copilot session detail needs a dedicated replay parser for events.jsonl before this page can render turn-by-turn output."
+          />
+        </div>
+      </div>
+    )
+  }
 
   if (replayError) {
     return (

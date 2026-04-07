@@ -146,3 +146,30 @@ export function formatPct(value: number, total: number): string {
   if (total === 0) return '0%'
   return `${((value / total) * 100).toFixed(1)}%`
 }
+
+export function shortModelName(model: string | undefined): string {
+  if (!model) return '—'
+  if (model.includes('opus-4-6')) return 'Opus 4.6'
+  if (model.includes('opus-4-5')) return 'Opus 4.5'
+  if (model.includes('sonnet-4-6')) return 'Sonnet 4.6'
+  if (model.includes('sonnet-4-5')) return 'Sonnet 4.5'
+  if (model.includes('haiku-4-6')) return 'Haiku 4.6'
+  if (model.includes('haiku-4-5')) return 'Haiku 4.5'
+  if (model.startsWith('gpt-5.4')) return 'GPT-5.4'
+  if (model.startsWith('gpt-5.3')) return 'GPT-5.3'
+  if (model.startsWith('gpt-5.2')) return 'GPT-5.2'
+  if (model.startsWith('gpt-5.1')) return 'GPT-5.1'
+  if (model.startsWith('gpt-5-mini')) return 'GPT-5 mini'
+  if (model.startsWith('gpt-4.1')) return 'GPT-4.1'
+  if (model.startsWith('gemini-3-pro-preview')) return 'Gemini 3 Pro'
+  if (model.startsWith('gemini')) return 'Gemini'
+  return model
+}
+
+export function getConversationModel(modelInfo: { primary_model?: string; model?: string }): string | undefined {
+  return modelInfo.primary_model ?? modelInfo.model
+}
+
+export function shortConversationModelName(modelInfo: { primary_model?: string; model?: string }): string {
+  return shortModelName(getConversationModel(modelInfo))
+}

@@ -4,7 +4,8 @@ import { useParams } from 'next/navigation'
 import useSWR from 'swr'
 import Link from 'next/link'
 import { PageHeader } from '@/common/components/layout/page-header'
-import { formatCost, formatDuration, formatDate, formatTokens } from '@/common/helpers/formatters'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { formatCost, formatDuration, formatDate } from '@/common/helpers/formatters'
 import { GROUP_COLORS, classifyTool } from '@/common/helpers/tool-groups'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import type { ConversationWithFacet } from '@/common/types/models'
@@ -24,6 +25,7 @@ interface ProjectDetail {
 export default function ProjectDetailPage() {
   const params = useParams()
   const workspaceId = params?.slug as string
+  const { source, capabilities } = useAnalyticsSource()
 
   const { data, error, isLoading } = useSWR<ProjectDetail>(
     workspaceId ? `/api/projects/${workspaceId}` : null,
@@ -58,6 +60,7 @@ export default function ProjectDetailPage() {
   const maxToolCount = topTools[0]?.[1] ?? 1
 
   const totalCost = (data.sessions ?? []).reduce((s, x) => s + (x.estimated_cost ?? 0), 0)
+  const totalPremiumRequests = (data.sessions ?? []).reduce((sum, x) => sum + (x.premium_requests ?? 0), 0)
   const totalMsgs = (data.sessions ?? []).reduce((s, x) => s + (x.user_message_count ?? 0) + (x.assistant_message_count ?? 0), 0)
   const totalDuration = (data.sessions ?? []).reduce((s, x) => s + (x.duration_minutes ?? 0), 0)
 
@@ -80,7 +83,9 @@ export default function ProjectDetailPage() {
     <div className="flex flex-col min-h-screen">
       <PageHeader
         title={`${data.display_name}`}
-        subtitle={`${sessions.length} sessions · ${formatCost(totalCost)} · ${formatDuration(totalDuration)}`}
+        subtitle={source === 'claude'
+          ? `${sessions.length} sessions · ${formatCost(totalCost)} · ${formatDuration(totalDuration)}`
+          : `${sessions.length} sessions · ${totalPremiumRequests.toLocaleString()} premium reqs · ${formatDuration(totalDuration)}`}
       />
 
       <div className="p-6 space-y-6">
@@ -96,7 +101,12 @@ export default function ProjectDetailPage() {
           <span className="text-border">·</span>
           <span className="text-muted-foreground">messages: <span className="text-foreground font-bold">{totalMsgs.toLocaleString()}</span></span>
           <span className="text-border">·</span>
-          <span className="text-muted-foreground">cost: <span className="text-[#d97706] font-bold">{formatCost(totalCost)}</span></span>
+          <span className="text-muted-foreground">
+            {source === 'claude' ? 'cost' : 'premium reqs'}:{' '}
+            <span className="text-[#d97706] font-bold">
+              {source === 'claude' ? formatCost(totalCost) : totalPremiumRequests.toLocaleString()}
+            </span>
+          </span>
           <span className="text-border">·</span>
           <span className="text-muted-foreground">duration: <span className="text-foreground font-bold">{formatDuration(totalDuration)}</span></span>
         </div>
@@ -109,7 +119,7 @@ export default function ProjectDetailPage() {
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-border bg-muted">
-                    {['Date', 'Slug', 'Msgs', 'Cost'].map(h => (
+                    {['Date', 'Slug', 'Msgs', source === 'claude' ? 'Cost' : 'Premium'].map(h => (
                       <th key={h} className={`px-3 py-2 text-[12px] font-bold text-muted-foreground uppercase tracking-wider ${h === 'Date' || h === 'Slug' ? 'text-left' : 'text-right'}`}>{h}</th>
                     ))}
                   </tr>
@@ -121,12 +131,23 @@ export default function ProjectDetailPage() {
                       <tr key={s.session_id} className={`border-b border-border/30 hover:bg-muted/50 transition-colors ${i % 2 ? 'bg-muted/20' : ''}`}>
                         <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{formatDate(s.start_time)}</td>
                         <td className="px-3 py-2">
-                          <Link href={`/sessions/${s.session_id}`} className="text-foreground hover:text-primary transition-colors">
-                            {s.slug ?? s.session_id.slice(0, 8)}
-                          </Link>
+                          {capabilities.sessionDetail ? (
+                            <Link href={`/sessions/${s.session_id}`} className="text-foreground hover:text-primary transition-colors">
+                              {s.slug ?? s.session_id.slice(0, 8)}
+                            </Link>
+                          ) : (
+                            <span
+                              className="text-foreground"
+                              title="Session detail is not available in Copilot mode"
+                            >
+                              {s.slug ?? s.session_id.slice(0, 8)}
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right text-muted-foreground">{msgs}</td>
-                        <td className="px-3 py-2 text-right text-[#d97706] font-mono">{formatCost(s.estimated_cost)}</td>
+                        <td className="px-3 py-2 text-right text-[#d97706] font-mono">
+                          {source === 'claude' ? formatCost(s.estimated_cost) : (s.premium_requests ?? 0).toLocaleString()}
+                        </td>
                       </tr>
                     )
                   })}
@@ -158,7 +179,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Cost over time chart */}
-        {costBySessions.length > 1 && (
+        {source === 'claude' && costBySessions.length > 1 && (
           <div className="border border-border rounded bg-card p-4 overflow-visible">
             <h2 className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Cost Per Session</h2>
             <ResponsiveContainer width="100%" height={200}>
@@ -191,6 +212,44 @@ export default function ProjectDetailPage() {
                   formatter={(v: any) => [formatCost(v ?? 0), 'Cost']}
                 />
                 <Line type="monotone" dataKey="cost" stroke="#d97706" strokeWidth={2} dot={{ r: 3, fill: '#d97706' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {source === 'copilot' && sessions.some(s => (s.premium_requests ?? 0) > 0) && (
+          <div className="border border-border rounded bg-card p-4 overflow-visible">
+            <h2 className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Premium Requests Per Session</h2>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart
+                data={sessions.map(s => ({
+                  date: s.start_time.slice(0, 10),
+                  premium: s.premium_requests ?? 0,
+                }))}
+                margin={{ top: 8, right: 16, bottom: 24, left: 8 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                  tickLine={false}
+                  axisLine={false}
+                  interval="preserveStartEnd"
+                  height={36}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(v: any) => [v ?? 0, 'Premium requests']}
+                />
+                <Line type="monotone" dataKey="premium" stroke="#d97706" strokeWidth={2} dot={{ r: 3, fill: '#d97706' }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

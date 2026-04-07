@@ -1,16 +1,13 @@
 'use client'
 
-import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
 import { CalendarHeatmap } from '@/modules/dashboard/components/calendar-heatmap'
 import { BusyHoursChart } from '@/modules/dashboard/components/busy-hours-chart'
 import { WeekdayChart } from '@/modules/timeline/components/weekday-chart'
 import { StreakPanel } from '@/modules/timeline/components/streak-panel'
 import { UsageOverTimeChart } from '@/modules/dashboard/components/usage-over-time-chart'
 import type { DailyStats } from '@/common/types/models'
-
-const fetcher = (url: string) =>
-  fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
 
 interface ActivityData {
   daily_activity: DailyStats[]
@@ -32,7 +29,10 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 export default function ActivityPage() {
-  const { data, error, isLoading } = useSWR<ActivityData>('/api/activity', fetcher, { refreshInterval: 5_000 })
+  const { data, error, isLoading } = useAnalyticsSWR<ActivityData>('/api/activity', {
+    refreshInterval: 5_000,
+  })
+  const showLoading = isLoading && !data
 
   // hourCounts as Record<string, number> for BusyHoursChart
   const hourCounts = data
@@ -44,7 +44,7 @@ export default function ActivityPage() {
       <PageHeader title="claude-code-analytics · activity" subtitle="patterns, streaks, peak hours" />
       <div className="p-6 space-y-6">
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
-        {isLoading && (
+        {showLoading && (
           <div className="space-y-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="h-40 bg-muted rounded animate-pulse" />

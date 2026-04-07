@@ -1,4 +1,5 @@
 import { getCachedSessions } from '@/common/helpers/session-cache'
+import type { AnalyticsSource } from '@/common/helpers/analytics-source'
 import { calcDailyStatsFromSessions } from '@/modules/dashboard/service'
 
 export function calcStreaks(dates: Set<string>): { current: number; longest: number } {
@@ -30,8 +31,8 @@ export function calcStreaks(dates: Set<string>): { current: number; longest: num
   return { current, longest }
 }
 
-export async function compileActivityPayload() {
-  const sessions = await getCachedSessions()
+export async function compileActivityPayload(source: AnalyticsSource = 'claude') {
+  const sessions = await getCachedSessions(source)
   const dailyActivity = calcDailyStatsFromSessions(sessions)
 
   const hourCounts: Record<string, number> = {}

@@ -1,23 +1,30 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
 import { WorkspaceCard } from '@/modules/workspaces/components/workspace-card'
 import type { WorkspaceSummary } from '@/common/types/models'
 
-const fetcher = (url: string) =>
-  fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
-
-type SortField = 'last_active' | 'estimated_cost' | 'session_count' | 'total_duration_minutes'
+type SortField = 'last_active' | 'estimated_cost' | 'premium_requests' | 'session_count' | 'total_duration_minutes'
 
 export default function ProjectsPage() {
-  const { data, error, isLoading } = useSWR<{ projects: WorkspaceSummary[] }>(
-    '/api/projects', fetcher, { refreshInterval: 5_000 }
+  const { source, dataRoot } = useAnalyticsSource()
+  const { data, error, isLoading } = useAnalyticsSWR<{ projects: WorkspaceSummary[] }>(
+    '/api/projects',
+    { refreshInterval: 5_000 }
   )
+  const showLoading = isLoading && !data
 
   const [sort, setSort] = useState<SortField>('last_active')
   const [search, setSearch] = useState('')
+  const effectiveSort: SortField =
+    source === 'copilot' && sort === 'estimated_cost'
+      ? 'premium_requests'
+      : source === 'claude' && sort === 'premium_requests'
+        ? 'estimated_cost'
+        : sort
 
   const sorted = useMemo(() => {
     if (!data) return []
@@ -30,10 +37,10 @@ export default function ProjectsPage() {
       )
     }
     return projects.sort((a, b) => {
-      if (sort === 'last_active') return b.last_active.localeCompare(a.last_active)
-      return (b[sort] as number) - (a[sort] as number)
+      if (effectiveSort === 'last_active') return b.last_active.localeCompare(a.last_active)
+      return (b[effectiveSort] as number) - (a[effectiveSort] as number)
     })
-  }, [data, sort, search])
+  }, [data, effectiveSort, search])
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -55,14 +62,16 @@ export default function ProjectsPage() {
           <div className="flex gap-1 ml-auto">
             {([
               { k: 'last_active', label: 'Recent' },
-              { k: 'estimated_cost', label: 'Cost' },
+              ...(source === 'claude'
+                ? [{ k: 'estimated_cost', label: 'Cost' }]
+                : [{ k: 'premium_requests', label: 'Premium' }]),
               { k: 'session_count', label: 'Sessions' },
               { k: 'total_duration_minutes', label: 'Time' },
             ] as Array<{ k: SortField; label: string }>).map(({ k, label }) => (
               <button
                 key={k}
                 onClick={() => setSort(k)}
-                className={`px-2 py-1 rounded text-[12px] transition-colors ${sort === k ? 'bg-primary text-black font-bold' : 'text-muted-foreground hover:text-foreground border border-border'}`}
+                className={`px-2 py-1 rounded text-[12px] transition-colors ${effectiveSort === k ? 'bg-primary text-black font-bold' : 'text-muted-foreground hover:text-foreground border border-border'}`}
               >
                 {label}
               </button>
@@ -70,7 +79,7 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {isLoading && (
+        {showLoading && (
           <div className="grid grid-cols-2 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-48 bg-muted rounded animate-pulse" />
@@ -80,13 +89,13 @@ export default function ProjectsPage() {
 
         {sorted.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-            {sorted.map(p => <WorkspaceCard key={p.slug} project={p} />)}
+            {sorted.map(p => <WorkspaceCard key={p.slug} project={p} source={source} />)}
           </div>
         )}
 
-        {!isLoading && sorted.length === 0 && (
+        {!showLoading && sorted.length === 0 && (
           <p className="text-muted-foreground/50 text-sm text-center py-12">
-            {search ? 'No projects match your search.' : 'No projects found in ~/.claude/'}
+            {search ? 'No projects match your search.' : `No projects found in ${dataRoot}/`}
           </p>
         )}
       </div>

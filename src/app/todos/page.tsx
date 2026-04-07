@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { SourceUnsupportedState } from '@/common/components/source-unsupported-state'
+import { getAnalyticsTodosPath } from '@/common/helpers/analytics-source'
 
 const fetcher = (url: string) =>
   fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
@@ -142,8 +145,12 @@ function TodoRow({ item, file }: { item: TodoItem; file: TodoRecord }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function TodosPage() {
+  const { capabilities, source } = useAnalyticsSource()
+  const todosPath = getAnalyticsTodosPath(source)
   const { data, error, isLoading } = useSWR<{ todos: TodoRecord[] }>(
-    '/api/todos', fetcher, { refreshInterval: 10_000 }
+    capabilities.todos ? '/api/todos' : null,
+    fetcher,
+    { refreshInterval: 10_000 }
   )
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<FilterMode>('all')
@@ -174,9 +181,23 @@ export default function TodosPage() {
     { key: 'completed',   label: 'done',        accent: '#6ee7b7' },
   ]
 
+  if (!capabilities.todos) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <PageHeader title="claude-code-analytics · todos" subtitle={todosPath} />
+        <div className="p-4 md:p-6">
+          <SourceUnsupportedState
+            feature="Todos"
+            detail={`State is stored in ${todosPath}, but there is no clean app-wide todo store equivalent to ${getAnalyticsTodosPath('claude')} yet.`}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="claude-code-analytics · todos" subtitle="~/.claude/todos/" />
+      <PageHeader title="claude-code-analytics · todos" subtitle={todosPath} />
       <div className="p-4 md:p-6 space-y-5">
 
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
@@ -233,7 +254,7 @@ export default function TodosPage() {
                 <p className="text-3xl mb-3">✓</p>
                 <p className="text-muted-foreground/60 text-sm font-mono">
                   {allItems.length === 0
-                    ? 'No todos found in ~/.claude/todos/'
+                    ? `No todos found in ${todosPath}`
                     : 'No todos match your filter.'}
                 </p>
               </div>

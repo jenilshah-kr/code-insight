@@ -47,7 +47,9 @@ export interface StatsSnapshot {
 
 export interface SessionInfo {
   session_id: string
+  source?: 'claude' | 'copilot'
   model?: string
+  primary_model?: string
   project_path: string
   start_time: string
   duration_minutes: number
@@ -61,12 +63,18 @@ export interface SessionInfo {
   output_tokens: number
   cache_creation_input_tokens?: number
   cache_read_input_tokens?: number
+  premium_requests?: number
+  current_context_tokens?: number
+  system_context_tokens?: number
+  conversation_context_tokens?: number
+  tool_definition_tokens?: number
   first_prompt: string
   user_interruptions: number
   user_response_times: number[]
   tool_errors: number
   tool_error_categories: Record<string, number>
   uses_task_agent: boolean
+  uses_plan_mode?: boolean
   uses_mcp: boolean
   uses_web_search: boolean
   uses_web_fetch: boolean
@@ -188,6 +196,7 @@ export interface WorkspaceSummary {
   git_commits: number
   git_pushes: number
   estimated_cost: number
+  premium_requests?: number
   input_tokens: number
   output_tokens: number
   languages: Record<string, number>

@@ -3,6 +3,9 @@
 import { useState, useMemo } from 'react'
 import useSWR, { mutate } from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { SourceUnsupportedState } from '@/common/components/source-unsupported-state'
+import { getAnalyticsMemoryPath } from '@/common/helpers/analytics-source'
 import type { MemoryRecord, MemoryType } from '@/common/helpers/data-reader'
 import { workspaceDisplayName, workspaceShortPath, formatRelativeDate } from '@/common/helpers/formatters'
 
@@ -210,8 +213,12 @@ function MetricCard({ value, label, color }: { value: number; label: string; col
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MemoryPage() {
+  const { capabilities, source } = useAnalyticsSource()
+  const memoryPath = getAnalyticsMemoryPath(source)
   const { data, error, isLoading } = useSWR<{ memories: MemoryRecord[] }>(
-    '/api/memory', fetcher, { refreshInterval: 15_000 }
+    capabilities.memory ? '/api/memory' : null,
+    fetcher,
+    { refreshInterval: 15_000 }
   )
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
@@ -258,9 +265,23 @@ export default function MemoryPage() {
     setExpandedId(prev => (prev === id ? null : id))
   }
 
+  if (!capabilities.memory) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <PageHeader title="claude-code-analytics · memory" subtitle={memoryPath} />
+        <div className="p-4 md:p-6">
+          <SourceUnsupportedState
+            feature="Memory"
+            detail={`This page expects project memory directories like ${getAnalyticsMemoryPath('claude')}. A supported ${memoryPath} equivalent has not been wired up yet.`}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="claude-code-analytics · memory" subtitle="~/.claude/projects/*/memory/" />
+      <PageHeader title="claude-code-analytics · memory" subtitle={memoryPath} />
       <div className="p-4 md:p-6 space-y-5">
 
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error loading memories.</p>}
@@ -338,7 +359,7 @@ export default function MemoryPage() {
                 <p className="text-3xl mb-3">🧠</p>
                 <p className="text-muted-foreground/60 text-sm font-mono">
                   {memories.length === 0
-                    ? 'No memory files found in ~/.claude/projects/*/memory/'
+                    ? `No memory files found in ${memoryPath}`
                     : 'No memories match your filter.'}
                 </p>
               </div>

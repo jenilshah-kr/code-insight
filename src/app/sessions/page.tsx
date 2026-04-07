@@ -1,19 +1,16 @@
 'use client'
 
-import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
 import { ConversationList } from '@/modules/conversations/components/conversation-list'
 import type { ConversationWithFacet } from '@/common/types/models'
 
-const fetcher = (url: string) =>
-  fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
-
 export default function SessionsPage() {
-  const { data, error, isLoading } = useSWR<{ sessions: ConversationWithFacet[]; total: number }>(
+  const { data, error, isLoading } = useAnalyticsSWR<{ sessions: ConversationWithFacet[]; total: number }>(
     '/api/sessions',
-    fetcher,
     { refreshInterval: 5_000 }
   )
+  const showLoading = isLoading && !data
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -25,7 +22,7 @@ export default function SessionsPage() {
         {error && (
           <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>
         )}
-        {isLoading && (
+        {showLoading && (
           <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-10 bg-muted rounded animate-pulse" />

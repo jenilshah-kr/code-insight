@@ -1,9 +1,10 @@
 'use client'
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
 import type { ModelMetrics } from '@/common/types/models'
 import { calcTotalCostFromModel } from '@/common/helpers/rates'
-import { formatCost } from '@/common/helpers/formatters'
+import { formatCost, formatTokens, shortModelName } from '@/common/helpers/formatters'
 
 const COLORS = ['#fbbf24', '#60a5fa', '#34d399', '#a78bfa', '#f87171', '#fb923c']
 
@@ -11,20 +12,17 @@ interface Props {
   modelUsage: Record<string, ModelMetrics>
 }
 
-function shortModel(m: string): string {
-  if (m.includes('opus-4-6'))   return 'Opus 4.6'
-  if (m.includes('opus-4-5'))   return 'Opus 4.5'
-  if (m.includes('sonnet-4-6')) return 'Sonnet 4.6'
-  if (m.includes('sonnet-4-5')) return 'Sonnet 4.5'
-  if (m.includes('haiku-4-5'))  return 'Haiku 4.5'
-  return m.split('-').slice(-2).join(' ')
-}
-
 export function ModelBreakdownDonut({ modelUsage }: Props) {
+  const { source } = useAnalyticsSource()
   const data = Object.entries(modelUsage)
     .map(([model, usage]) => ({
-      name: shortModel(model),
-      value: calcTotalCostFromModel(model, usage),
+      name: shortModelName(model),
+      value: source === 'claude'
+        ? calcTotalCostFromModel(model, usage)
+        : (usage.inputTokens ?? 0)
+          + (usage.outputTokens ?? 0)
+          + (usage.cacheCreationInputTokens ?? 0)
+          + (usage.cacheReadInputTokens ?? 0),
     }))
     .filter(d => d.value > 0)
     .sort((a, b) => b.value - a.value)
@@ -50,7 +48,10 @@ export function ModelBreakdownDonut({ modelUsage }: Props) {
         <Tooltip
           contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(val: any) => [formatCost(val ?? 0), 'cost']}
+          formatter={(val: any) => [
+            source === 'claude' ? formatCost(val ?? 0) : formatTokens(val ?? 0),
+            source === 'claude' ? 'cost' : 'tokens',
+          ]}
         />
         <Legend
           formatter={(value) => <span style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>{value}</span>}

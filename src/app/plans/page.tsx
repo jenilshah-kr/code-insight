@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { SourceUnsupportedState } from '@/common/components/source-unsupported-state'
+import { getAnalyticsPlansPath } from '@/common/helpers/analytics-source'
 
 const fetcher = (url: string) =>
   fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
@@ -208,8 +211,12 @@ function PlanCard({ plan }: { plan: PlanRecord }) {
 }
 
 export default function PlansPage() {
+  const { capabilities, source } = useAnalyticsSource()
+  const plansPath = getAnalyticsPlansPath(source)
   const { data, error, isLoading } = useSWR<{ plans: PlanRecord[] }>(
-    '/api/plans', fetcher, { refreshInterval: 30_000 }
+    capabilities.plans ? '/api/plans' : null,
+    fetcher,
+    { refreshInterval: 30_000 }
   )
   const [search, setSearch] = useState('')
 
@@ -220,9 +227,23 @@ export default function PlansPage() {
     p.content.toLowerCase().includes(search.toLowerCase())
   )
 
+  if (!capabilities.plans) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <PageHeader title="claude-code-analytics · plans" subtitle={plansPath} />
+        <div className="p-4 md:p-6">
+          <SourceUnsupportedState
+            feature="Plans"
+            detail={`Plans are stored in ${plansPath}, but this page still assumes the shared ${getAnalyticsPlansPath('claude')} index.`}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="claude-code-analytics · plans" subtitle="~/.claude/plans/" />
+      <PageHeader title="claude-code-analytics · plans" subtitle={plansPath} />
       <div className="p-4 md:p-6 space-y-5">
 
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
@@ -260,7 +281,7 @@ export default function PlansPage() {
                 <p className="text-[#d97706] text-2xl mb-3">📋</p>
                 <p className="text-muted-foreground/80 text-sm font-mono">
                   {plans.length === 0
-                    ? 'No plans found in ~/.claude/plans/'
+                    ? `No plans found in ${plansPath}`
                     : 'No plans match your search.'}
                 </p>
               </div>

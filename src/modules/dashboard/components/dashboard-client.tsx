@@ -1,18 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import useSWR from 'swr'
 import { BarChart2, PieChart, Clock } from 'lucide-react'
 import { UsageOverTimeChart } from './usage-over-time-chart'
 import { BusyHoursChart } from './busy-hours-chart'
 import { ModelBreakdownDonut } from './model-breakdown-donut'
 import { ProjectActivityDonut } from './project-activity-donut'
 import { SessionSummaryTable } from './session-summary-table'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
 import { formatTokens } from '@/common/helpers/formatters'
+import type { DailyStats, ModelMetrics } from '@/common/types/models'
 import type { WorkspaceSummary } from '@/common/types/models'
-
-const fetcher = (url: string) =>
-  fetch(url).then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
 
 function toMmDdYyyy(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -95,18 +93,35 @@ function ChartCard({
   )
 }
 
+interface DashboardStatsPayload {
+  stats: {
+    totalMessages: number
+    dailyActivity: DailyStats[]
+    modelUsage: Record<string, ModelMetrics>
+    hourCounts: Record<string, number>
+  }
+  computed: {
+    sessionCount: number
+    sessionsThisMonth: number
+    sessionsThisWeek: number
+    totalTokens: number
+    storageBytes: number
+  }
+}
+
 export function DashboardClient() {
   const defaults = getDefaultDates()
   const [dateFrom, setDateFrom] = useState(defaults.from)
   const [dateTo, setDateTo] = useState(defaults.to)
 
-  const { data, error, isLoading } = useSWR('/api/stats', fetcher, { refreshInterval: 5_000 })
-  const { data: projectsData } = useSWR<{ projects: WorkspaceSummary[] }>('/api/projects', fetcher, {
+  const { data, error, isLoading } = useAnalyticsSWR<DashboardStatsPayload>('/api/stats', { refreshInterval: 5_000 })
+  const { data: projectsData } = useAnalyticsSWR<{ projects: WorkspaceSummary[] }>('/api/projects', {
     refreshInterval: 30_000,
   })
+  const showLoading = isLoading && !data
 
   if (error) return <p className="p-6 text-destructive text-sm font-mono">Error: {String(error)}</p>
-  if (isLoading) {
+  if (showLoading) {
     return (
       <div className="p-6 space-y-3">
         <div className="h-8 bg-muted rounded animate-pulse w-2/3" />

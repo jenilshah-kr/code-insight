@@ -1,17 +1,20 @@
 'use client'
 
-import useSWR from 'swr'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
 import type { WorkspaceSummary } from '@/common/types/models'
-
-const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 const COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#f87171', '#fb923c', '#38bdf8']
 
 export function ProjectActivityDonut() {
-  const { data } = useSWR<{ projects: WorkspaceSummary[] }>('/api/projects', fetcher, { refreshInterval: 30_000 })
+  const { data, error, isLoading } = useAnalyticsSWR<{ projects: WorkspaceSummary[] }>('/api/projects', {
+    refreshInterval: 30_000,
+  })
+  const showLoading = isLoading && !data
 
-  if (!data) return <p className="text-muted-foreground/50 text-sm text-center py-8">Loading…</p>
+  if (error) return <p className="text-destructive text-sm text-center py-8">Error: {String(error)}</p>
+  if (showLoading) return <p className="text-muted-foreground/50 text-sm text-center py-8">Loading…</p>
+  if (!data) return null
 
   const sorted = [...data.projects]
     .filter(p => p.session_count > 0)

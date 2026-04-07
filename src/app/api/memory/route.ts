@@ -1,16 +1,25 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs/promises'
 import path from 'path'
-import { loadMemories, DATA_DIR } from '@/common/helpers/data-reader'
+import { getAnalyticsSourceFromRequest } from '@/common/helpers/analytics-source'
+import { loadMemoriesForSource } from '@/common/helpers/analytics-reader'
+import { DATA_DIR } from '@/common/helpers/data-reader'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
-  const memories = await loadMemories()
+export async function GET(req: Request) {
+  const source = getAnalyticsSourceFromRequest(req)
+  if (source === 'copilot') {
+    return NextResponse.json({ error: 'Memory is not supported for Copilot analytics yet' }, { status: 501 })
+  }
+  const memories = await loadMemoriesForSource(source)
   return NextResponse.json({ memories })
 }
 
 export async function PATCH(req: Request) {
+  if (getAnalyticsSourceFromRequest(req) === 'copilot') {
+    return NextResponse.json({ error: 'Memory editing is not supported for Copilot analytics yet' }, { status: 501 })
+  }
   try {
     const { projectSlug, file, content } = await req.json() as {
       projectSlug?: string

@@ -40,6 +40,28 @@ export const TOOL_GROUPS: Record<string, InstrumentCategory> = {
   ToolSearch:     'skill',
   ListMcpResourcesTool: 'skill',
   ReadMcpResourceTool:  'skill',
+  view:           'file-io',
+  glob:           'file-io',
+  rg:             'file-io',
+  bash:           'shell',
+  list_bash:      'shell',
+  read_bash:      'shell',
+  write_bash:     'shell',
+  stop_bash:      'shell',
+  apply_patch:    'file-io',
+  task:           'agent',
+  task_complete:  'agent',
+  read_agent:     'agent',
+  write_agent:    'agent',
+  list_agents:    'agent',
+  web_fetch:      'web',
+  web_search:     'web',
+  report_intent:  'planning',
+  ask_user:       'planning',
+  exit_plan_mode: 'planning',
+  sql:            'todo',
+  skill:          'skill',
+  fetch_copilot_cli_documentation: 'skill',
 }
 
 export const GROUP_COLORS: Record<InstrumentCategory, string> = {
@@ -79,22 +101,36 @@ export const GROUP_LABELS: Record<InstrumentCategory, string> = {
 }
 
 export function classifyTool(name: string): InstrumentCategory {
-  if (name.startsWith('mcp__')) return 'mcp'
-  return TOOL_GROUPS[name] ?? 'other'
+  const normalized = name.trim()
+  if (isMcpInstrument(normalized)) return 'mcp'
+  return TOOL_GROUPS[normalized] ?? TOOL_GROUPS[normalized.toLowerCase()] ?? 'other'
 }
 
 export function isMcpInstrument(name: string): boolean {
-  return name.startsWith('mcp__')
+  const normalized = name.toLowerCase()
+  return normalized.startsWith('mcp__') || normalized.startsWith('github-mcp-server-')
 }
 
 export function parseMcpInstrument(name: string): { server: string; tool: string } | null {
-  if (!name.startsWith('mcp__')) return null
-  const parts = name.split('__')
-  if (parts.length < 3) return null
-  return {
-    server: parts[1],
-    tool:   parts.slice(2).join('__'),
+  const normalized = name.toLowerCase()
+
+  if (normalized.startsWith('mcp__')) {
+    const parts = name.split('__')
+    if (parts.length < 3) return null
+    return {
+      server: parts[1],
+      tool: parts.slice(2).join('__'),
+    }
   }
+
+  if (normalized.startsWith('github-mcp-server-')) {
+    return {
+      server: 'github-mcp-server',
+      tool: name.slice('github-mcp-server-'.length),
+    }
+  }
+
+  return null
 }
 
 export function instrumentDisplayName(name: string): string {

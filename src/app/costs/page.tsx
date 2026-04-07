@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { SourceUnsupportedState } from '@/common/components/source-unsupported-state'
 import { SpendOverTimeChart } from '@/modules/spending/components/spend-over-time-chart'
 import { SpendByWorkspaceChart } from '@/modules/spending/components/spend-by-workspace-chart'
 import { ModelUsageTable } from '@/modules/spending/components/model-usage-table'
@@ -24,8 +26,27 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
 }
 
 export default function CostsPage() {
-  const { data, error, isLoading } = useSWR<SpendAnalytics>('/api/costs', fetcher, { refreshInterval: 5_000 })
+  const { capabilities } = useAnalyticsSource()
+  const { data, error, isLoading } = useSWR<SpendAnalytics>(
+    capabilities.costs ? '/api/costs' : null,
+    fetcher,
+    { refreshInterval: 5_000 }
+  )
   const [explainerOpen, setExplainerOpen] = useState(false)
+
+  if (!capabilities.costs) {
+    return (
+      <div className="flex flex-col min-h-screen">
+        <PageHeader title="claude-code-analytics · costs" subtitle="estimated spend by source" />
+        <div className="p-6">
+          <SourceUnsupportedState
+            feature="Cost analytics"
+            detail="Copilot exposes premium-request and token usage data, but this view still assumes Claude-style dollar cost semantics."
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col min-h-screen">

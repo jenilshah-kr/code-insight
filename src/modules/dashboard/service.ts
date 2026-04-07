@@ -1,4 +1,5 @@
-import { getStorageBytes } from '@/common/helpers/data-reader'
+import { getStorageBytesForSource } from '@/common/helpers/analytics-reader'
+import type { AnalyticsSource } from '@/common/helpers/analytics-source'
 import { getCachedSessions, getCachedDerived } from '@/common/helpers/session-cache'
 import { calcTotalCostFromModel, getRates } from '@/common/helpers/rates'
 import type { DailyStats, ModelMetrics, SessionInfo } from '@/common/types/models'
@@ -25,14 +26,14 @@ export function calcDailyStatsFromSessions(sessions: SessionInfo[]): DailyStats[
 }
 
 
-export function compileStatsPayload() {
-  return getCachedDerived('stats', _compileStatsPayload)
+export function compileStatsPayload(source: AnalyticsSource = 'claude') {
+  return getCachedDerived('stats', () => _compileStatsPayload(source), source)
 }
 
-async function _compileStatsPayload() {
+async function _compileStatsPayload(source: AnalyticsSource) {
   const [sessions, storageBytes] = await Promise.all([
-    getCachedSessions(),
-    getStorageBytes(),
+    getCachedSessions(source),
+    getStorageBytesForSource(source),
   ])
 
   const dailyActivity = calcDailyStatsFromSessions(sessions)
@@ -55,11 +56,13 @@ async function _compileStatsPayload() {
 
   let totalCost = 0
   let totalCacheSavings = 0
-  for (const [model, usage] of Object.entries(liveModelUsage)) {
-    const cost = calcTotalCostFromModel(model, usage)
-    totalCost += cost
-    const p = getRates(model)
-    totalCacheSavings += (usage.cacheReadInputTokens ?? 0) * (p.input - p.cacheRead)
+  if (source === 'claude') {
+    for (const [model, usage] of Object.entries(liveModelUsage)) {
+      const cost = calcTotalCostFromModel(model, usage)
+      totalCost += cost
+      const p = getRates(model)
+      totalCacheSavings += (usage.cacheReadInputTokens ?? 0) * (p.input - p.cacheRead)
+    }
   }
 
   const totalInputTokens = sessions.reduce((s, m) => s + (m.input_tokens ?? 0), 0)

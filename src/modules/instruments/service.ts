@@ -1,5 +1,6 @@
 import path from 'path'
 import { listWorkspaceSlugs, listWorkspaceJSONLFiles, streamJSONLLines } from '@/common/helpers/data-reader'
+import type { AnalyticsSource } from '@/common/helpers/analytics-source'
 import { classifyTool, isMcpInstrument, parseMcpInstrument } from '@/common/helpers/tool-groups'
 import type { SessionInfo, InstrumentSummary, McpServerSummary, VersionRecord } from '@/common/types/models'
 
@@ -67,11 +68,28 @@ export function aggregateInstrumentCounts(sessions: SessionInfo[], totalSessions
     .sort((a, b) => b.total_calls - a.total_calls)
 
   const featureSessions = {
-    task_agents: sessions.filter(s => s.uses_task_agent || (s.tool_counts?.Task ?? 0) > 0).length,
+    task_agents: sessions.filter(s =>
+      s.uses_task_agent
+      || (s.tool_counts?.Task ?? 0) > 0
+      || (s.tool_counts?.task ?? 0) > 0
+      || (s.tool_counts?.task_complete ?? 0) > 0
+    ).length,
     mcp: sessions.filter(s => s.uses_mcp || Object.keys(s.tool_counts ?? {}).some(isMcpInstrument)).length,
-    web_search: sessions.filter(s => s.uses_web_search || (s.tool_counts?.WebSearch ?? 0) > 0).length,
-    web_fetch: sessions.filter(s => s.uses_web_fetch || (s.tool_counts?.WebFetch ?? 0) > 0).length,
-    plan_mode: sessions.filter(s => (s.tool_counts?.EnterPlanMode ?? 0) > 0).length,
+    web_search: sessions.filter(s =>
+      s.uses_web_search
+      || (s.tool_counts?.WebSearch ?? 0) > 0
+      || (s.tool_counts?.web_search ?? 0) > 0
+    ).length,
+    web_fetch: sessions.filter(s =>
+      s.uses_web_fetch
+      || (s.tool_counts?.WebFetch ?? 0) > 0
+      || (s.tool_counts?.web_fetch ?? 0) > 0
+    ).length,
+    plan_mode: sessions.filter(s =>
+      s.uses_plan_mode
+      || (s.tool_counts?.EnterPlanMode ?? 0) > 0
+      || (s.tool_counts?.enter_plan_mode ?? 0) > 0
+    ).length,
     git_commits: sessions.filter(s => (s.git_commits ?? 0) > 0).length,
   }
 
@@ -139,11 +157,54 @@ export async function gatherVersionData(slugs: string[]) {
   return { versions, branches }
 }
 
-export async function compileInstrumentAnalytics(sessions: SessionInfo[]) {
+export async function compileInstrumentAnalytics(sessions: SessionInfo[], source: AnalyticsSource = 'claude') {
   const totalSessions = sessions.length
   const { tools, mcp_servers, feature_adoption, totalToolCalls, errorCategories, totalErrors } =
     aggregateInstrumentCounts(sessions, totalSessions)
-  const slugs = await listWorkspaceSlugs()
-  const { versions, branches } = await gatherVersionData(slugs)
+  const { versions, branches } = source === 'claude'
+    ? await (async () => {
+      const slugs = await listWorkspaceSlugs()
+      return gatherVersionData(slugs)
+    })()
+    : (() => {
+      const versionMap = new Map<string, { sessionIds: Set<string>; dates: string[] }>()
+      const branchTurns = new Map<string, number>()
+
+      for (const session of sessions) {
+        if (session.version) {
+          const entry = versionMap.get(session.version) ?? { sessionIds: new Set<string>(), dates: [] }
+          entry.sessionIds.add(session.session_id)
+          entry.dates.push(session.start_time)
+          versionMap.set(session.version, entry)
+        }
+
+        if (session.git_branch) {
+          branchTurns.set(
+            session.git_branch,
+            (branchTurns.get(session.git_branch) ?? 0)
+              + (session.user_message_count ?? 0)
+              + (session.assistant_message_count ?? 0)
+          )
+        }
+      }
+
+      return {
+        versions: [...versionMap.entries()]
+          .map(([version, data]) => {
+            const sortedDates = data.dates.sort()
+            return {
+              version,
+              session_count: data.sessionIds.size,
+              first_seen: sortedDates[0] ?? '',
+              last_seen: sortedDates[sortedDates.length - 1] ?? '',
+            }
+          })
+          .sort((a, b) => b.last_seen.localeCompare(a.last_seen)),
+        branches: [...branchTurns.entries()]
+          .map(([branch, turns]) => ({ branch, turns }))
+          .sort((a, b) => b.turns - a.turns)
+          .slice(0, 15),
+      }
+    })()
   return { tools, mcp_servers, feature_adoption, versions, branches, error_categories: errorCategories, total_tool_calls: totalToolCalls, total_errors: totalErrors }
 }
