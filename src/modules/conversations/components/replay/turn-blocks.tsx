@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { InvocationBadge } from './tool-call-badge'
 import { CompressionCard } from './compaction-card'
-import { formatCost, formatTokens, formatDurationMs, formatDate } from '@/common/helpers/formatters'
-import type { SessionTurn, CompactionEvent, ToolInvocation } from '@/common/types/models'
+import { formatCost, formatTokens, formatDurationMs } from '@/common/helpers/formatters'
+import type { SessionTurn, CompactionEvent } from '@/common/types/models'
 
 interface TurnCardProps {
   turn: SessionTurn
@@ -26,12 +26,12 @@ function UsageBadge({ turn }: { turn: SessionTurn }) {
   return (
     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-sm font-mono bg-muted border border-border text-muted-foreground">
       🪙 {parts}
-      {turn.estimated_cost ? ` · ${formatCost(turn.estimated_cost)}` : ''}
+      {turn.estimated_cost ? ` · est:${formatCost(turn.estimated_cost)}` : ''}
     </span>
   )
 }
 
-export function UserMessageCard({ turn, compactionBefore, toolResults }: TurnCardProps) {
+export function UserMessageCard({ turn, compactionBefore }: TurnCardProps) {
   return (
     <div>
       {compactionBefore && <CompressionCard event={compactionBefore} />}

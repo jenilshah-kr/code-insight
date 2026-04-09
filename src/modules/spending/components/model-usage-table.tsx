@@ -1,4 +1,5 @@
 import type { ModelSpendBreakdown } from '@/common/types/models'
+import { ClaudeCostHint } from '@/common/components/claude-cost-disclosure'
 import { formatCost, formatTokens } from '@/common/helpers/formatters'
 
 interface Props {
@@ -6,13 +7,31 @@ interface Props {
 }
 
 export function ModelUsageTable({ models }: Props) {
+  const headers: Array<{ key: string; label: React.ReactNode; align: 'left' | 'right' }> = [
+    { key: 'model', label: 'Model', align: 'left' },
+    { key: 'input', label: 'Input', align: 'right' },
+    { key: 'output', label: 'Output', align: 'right' },
+    { key: 'cache-write', label: 'Cache Write', align: 'right' },
+    { key: 'cache-read', label: 'Cache Read', align: 'right' },
+    {
+      key: 'estimated-cost',
+      label: (
+        <span className="inline-flex items-center justify-end gap-1">
+          <span>Est. API Cost</span>
+          <ClaudeCostHint align="right" />
+        </span>
+      ),
+      align: 'right',
+    },
+  ]
+
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[13px] font-mono">
         <thead>
           <tr className="border-b border-border">
-            {['Model', 'Input', 'Output', 'Cache Write', 'Cache Read', 'Cost'].map(h => (
-              <th key={h} className={`py-2 text-[12px] font-bold text-muted-foreground uppercase tracking-wider ${h === 'Model' ? 'text-left' : 'text-right'}`}>{h}</th>
+            {headers.map(({ key, label, align }) => (
+              <th key={key} className={`py-2 text-[12px] font-bold text-muted-foreground uppercase tracking-wider ${align === 'left' ? 'text-left' : 'text-right'}`}>{label}</th>
             ))}
           </tr>
         </thead>

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { AnalyticsSource } from '@/common/helpers/analytics-source'
 import type { WorkspaceSummary } from '@/common/types/models'
+import { ClaudeCostHint } from '@/common/components/claude-cost-disclosure'
 import { formatCost, formatDuration, formatRelativeDate } from '@/common/helpers/formatters'
 
 interface Props {
@@ -24,9 +25,17 @@ export function WorkspaceCard({ project: p, source }: Props) {
           <p className="text-primary font-mono font-bold text-[15px]">
             {source === 'claude' ? formatCost(p.estimated_cost) : (p.premium_requests ?? 0).toLocaleString()}
           </p>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
-            {source === 'claude' ? 'est. cost' : 'premium reqs'}
-          </p>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+            {source === 'claude' ? (
+              <ClaudeCostHint
+                align="right"
+                className="justify-end"
+                label={<span>est. API cost</span>}
+              />
+            ) : (
+              'premium reqs'
+            )}
+          </div>
         </div>
       </div>
 
@@ -49,7 +58,14 @@ export function WorkspaceCard({ project: p, source }: Props) {
       {/* Footer badges */}
       <div className="flex flex-wrap gap-2 text-[12px]">
         {p.git_commits > 0 && (
-          <span className="text-[#047857] dark:text-[#34d399]">🔀 {p.git_commits} commits</span>
+          <span className="text-[#047857] dark:text-[#34d399]">
+            🔀 {p.git_commits} commits
+            {source === 'claude' && p.estimated_cost > 0 && (
+              <span className="text-muted-foreground/50 ml-1.5">
+                · {formatCost(p.estimated_cost / p.git_commits)}/commit
+              </span>
+            )}
+          </span>
         )}
         {p.uses_mcp && <span className="text-[#1d4ed8] dark:text-[#60a5fa]">🔌 MCP</span>}
         {p.uses_task_agent && <span className="text-[#6d28d9] dark:text-[#a78bfa]">🤖 agents</span>}

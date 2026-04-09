@@ -10,7 +10,6 @@ interface Props {
 
 export function SpendByWorkspaceChart({ projects }: Props) {
   const top = projects.slice(0, 15)
-  const max = top[0]?.estimated_cost ?? 1
 
   return (
     <ResponsiveContainer width="100%" height={Math.max(180, top.length * 30)}>
@@ -34,7 +33,7 @@ export function SpendByWorkspaceChart({ projects }: Props) {
         <Tooltip
           contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(val: any) => [formatCost(val ?? 0), 'cost']}
+          formatter={(val: any) => [formatCost(val ?? 0), 'estimated API cost']}
         />
         <Bar dataKey="estimated_cost" radius={[0, 3, 3, 0]}>
           {top.map((_, i) => (

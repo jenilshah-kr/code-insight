@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { ClaudeCostNote } from '@/common/components/claude-cost-disclosure'
 import { PageHeader } from '@/common/components/layout/page-header'
 import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
 import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
@@ -51,6 +52,8 @@ export default function ProjectsPage() {
       <div className="p-6 space-y-4">
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
 
+        {source === 'claude' && <ClaudeCostNote />}
+
         <div className="flex flex-wrap gap-2 items-center">
           <input
             type="text"
@@ -60,13 +63,13 @@ export default function ProjectsPage() {
             className="bg-muted border border-border rounded px-2 py-1 text-[13px] text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/50 w-48"
           />
           <div className="flex gap-1 ml-auto">
-            {([
-              { k: 'last_active', label: 'Recent' },
-              ...(source === 'claude'
-                ? [{ k: 'estimated_cost', label: 'Cost' }]
+              {([
+                { k: 'last_active', label: 'Recent' },
+                ...(source === 'claude'
+                ? [{ k: 'estimated_cost', label: 'Est. cost' }]
                 : [{ k: 'premium_requests', label: 'Premium' }]),
-              { k: 'session_count', label: 'Sessions' },
-              { k: 'total_duration_minutes', label: 'Time' },
+                { k: 'session_count', label: 'Sessions' },
+                { k: 'total_duration_minutes', label: 'Time' },
             ] as Array<{ k: SortField; label: string }>).map(({ k, label }) => (
               <button
                 key={k}

@@ -5,6 +5,7 @@ import useSWR from 'swr'
 import Link from 'next/link'
 import { PageHeader } from '@/common/components/layout/page-header'
 import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { ClaudeCostHint, ClaudeCostNote } from '@/common/components/claude-cost-disclosure'
 import { formatCost, formatDuration, formatDate } from '@/common/helpers/formatters'
 import { GROUP_COLORS, classifyTool } from '@/common/helpers/tool-groups'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -84,7 +85,7 @@ export default function ProjectDetailPage() {
       <PageHeader
         title={`${data.display_name}`}
         subtitle={source === 'claude'
-          ? `${sessions.length} sessions · ${formatCost(totalCost)} · ${formatDuration(totalDuration)}`
+          ? `${sessions.length} sessions · est. API cost ${formatCost(totalCost)} · ${formatDuration(totalDuration)}`
           : `${sessions.length} sessions · ${totalPremiumRequests.toLocaleString()} premium reqs · ${formatDuration(totalDuration)}`}
       />
 
@@ -95,14 +96,18 @@ export default function ProjectDetailPage() {
 
         <div className="text-[12px] text-muted-foreground/50 font-mono">{data.project_path}</div>
 
+        {source === 'claude' && <ClaudeCostNote />}
+
         {/* Stats row */}
         <div className="flex flex-wrap gap-6 py-3 border-y border-border text-[13px]">
           <span className="text-muted-foreground">sessions: <span className="text-foreground font-bold">{sessions.length}</span></span>
           <span className="text-border">·</span>
           <span className="text-muted-foreground">messages: <span className="text-foreground font-bold">{totalMsgs.toLocaleString()}</span></span>
           <span className="text-border">·</span>
-          <span className="text-muted-foreground">
-            {source === 'claude' ? 'cost' : 'premium reqs'}:{' '}
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            {source === 'claude'
+              ? <ClaudeCostHint label={<span>est. API cost:</span>} align="left" />
+              : 'premium reqs:'}
             <span className="text-[#d97706] font-bold">
               {source === 'claude' ? formatCost(totalCost) : totalPremiumRequests.toLocaleString()}
             </span>
@@ -119,9 +124,19 @@ export default function ProjectDetailPage() {
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-border bg-muted">
-                    {['Date', 'Slug', 'Msgs', source === 'claude' ? 'Cost' : 'Premium'].map(h => (
-                      <th key={h} className={`px-3 py-2 text-[12px] font-bold text-muted-foreground uppercase tracking-wider ${h === 'Date' || h === 'Slug' ? 'text-left' : 'text-right'}`}>{h}</th>
-                    ))}
+                    <th className="px-3 py-2 text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-left">Date</th>
+                    <th className="px-3 py-2 text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-left">Slug</th>
+                    <th className="px-3 py-2 text-[12px] font-bold text-muted-foreground uppercase tracking-wider text-right">Msgs</th>
+                    <th className="px-3 py-2 text-right">
+                      {source === 'claude' ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Est. cost</span>
+                          <ClaudeCostHint align="right" />
+                        </div>
+                      ) : (
+                        <span className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Premium</span>
+                      )}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -181,7 +196,10 @@ export default function ProjectDetailPage() {
         {/* Cost over time chart */}
         {source === 'claude' && costBySessions.length > 1 && (
           <div className="border border-border rounded bg-card p-4 overflow-visible">
-            <h2 className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Cost Per Session</h2>
+            <div className="mb-3 flex items-center gap-1.5">
+              <h2 className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest">Cost Per Session</h2>
+              <ClaudeCostHint align="left" />
+            </div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart
                 data={costBySessions.map(s => ({
@@ -209,7 +227,7 @@ export default function ProjectDetailPage() {
                 <Tooltip
                   contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }}
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(v: any) => [formatCost(v ?? 0), 'Cost']}
+                  formatter={(v: any) => [formatCost(v ?? 0), 'estimated API cost']}
                 />
                 <Line type="monotone" dataKey="cost" stroke="#d97706" strokeWidth={2} dot={{ r: 3, fill: '#d97706' }} />
               </LineChart>

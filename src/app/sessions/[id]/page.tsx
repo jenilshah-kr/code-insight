@@ -4,6 +4,7 @@ import { use } from 'react'
 import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
 import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { ClaudeCostHint, ClaudeCostNote } from '@/common/components/claude-cost-disclosure'
 import { SourceUnsupportedState } from '@/common/components/source-unsupported-state'
 import { DetailPanel } from '@/modules/conversations/components/replay/detail-panel'
 import { UserMessageCard, AssistantMessageCard } from '@/modules/conversations/components/replay/turn-blocks'
@@ -104,7 +105,7 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
       {/* Header */}
       <PageHeader
         title={`${projectName} · ${replay.slug ?? id.slice(0, 8)}`}
-        subtitle={`${replay.git_branch ?? '?'} · v${replay.version ?? '?'} · ${formatCost(replay.total_cost ?? 0)}`}
+        subtitle={`${replay.git_branch ?? '?'} · v${replay.version ?? '?'} · est. API cost ${formatCost(replay.total_cost ?? 0)}`}
       />
 
       {/* Stats bar */}
@@ -117,8 +118,9 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
           tokens: <span className="text-[#1d4ed8] dark:text-[#60a5fa] font-bold">{formatTokens(totalTokens)}</span>
         </span>
         <span className="text-border">·</span>
-        <span className="text-muted-foreground">
-          cost: <span className="text-[#d97706] font-bold">{formatCost(replay.total_cost ?? 0)}</span>
+        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+          <ClaudeCostHint label={<span>est. API cost:</span>} align="left" />
+          <span className="text-[#d97706] font-bold">{formatCost(replay.total_cost ?? 0)}</span>
         </span>
         {meta && (
           <>
@@ -136,8 +138,12 @@ export default function SessionDetailPage({ params }: { params: Promise<{ id: st
         )}
       </div>
 
+      <div className="px-4 pt-3">
+        <ClaudeCostNote />
+      </div>
+
       {/* Two-column layout */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden pt-3">
         {/* Conversation replay */}
         <div className="flex-1 min-w-0 overflow-y-auto px-4 py-6 max-w-6xl">
           {replay.turns.map((turn, i) => {

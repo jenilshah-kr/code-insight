@@ -8,6 +8,7 @@ import { InstrumentRankingChart } from '@/modules/instruments/components/instrum
 import { ServerPanel } from '@/modules/instruments/components/server-panel'
 import { AdoptionTable } from '@/modules/instruments/components/adoption-table'
 import { ReleaseHistoryTable } from '@/modules/instruments/components/release-history-table'
+import { ToolCooccurrenceMatrix } from '@/modules/instruments/components/tool-cooccurrence-matrix'
 import { GROUP_COLORS, GROUP_LABELS } from '@/common/helpers/tool-groups'
 import type { InstrumentAnalytics } from '@/common/types/models'
 
@@ -77,6 +78,11 @@ export default function ToolsPage() {
             {/* Tool ranking */}
             <Card title="All Tools — Ranked by Total Calls">
               <InstrumentRankingChart tools={data.tools} />
+            </Card>
+
+            {/* Co-occurrence matrix */}
+            <Card title="Tool Co-occurrence Matrix">
+              <ToolCooccurrenceMatrix />
             </Card>
 
             {/* MCP server details */}

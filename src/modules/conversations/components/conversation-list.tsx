@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { ClaudeCostHint } from '@/common/components/claude-cost-disclosure'
 import { FeatureBadges } from './feature-badges'
 import { formatCost, formatDuration, formatDate, workspaceDisplayName, encodeSlug, getConversationModel, shortConversationModelName } from '@/common/helpers/formatters'
 import type { ConversationWithFacet } from '@/common/types/models'
@@ -18,22 +19,27 @@ interface Props {
 }
 
 function SortableHeader({
-  label, k, sortKey, sortDir, onSort,
+  label, k, sortKey, sortDir, onSort, hint, align = 'left',
 }: {
   label: string
   k: SortField
   sortKey: SortField
   sortDir: SortOrder
   onSort: (k: SortField) => void
+  hint?: React.ReactNode
+  align?: 'left' | 'right'
 }) {
   const active = sortKey === k
   return (
-    <button
-      onClick={() => onSort(k)}
-      className={`text-left text-[12px] font-bold uppercase tracking-wider whitespace-nowrap hover:text-foreground transition-colors ${active ? 'text-primary' : 'text-muted-foreground'}`}
-    >
-      {label} {active ? (sortDir === 'desc' ? '↓' : '↑') : ''}
-    </button>
+    <div className={`flex items-center gap-1 ${align === 'right' ? 'justify-end' : 'justify-start'}`}>
+      <button
+        onClick={() => onSort(k)}
+        className={`text-left text-[12px] font-bold uppercase tracking-wider whitespace-nowrap hover:text-foreground transition-colors ${active ? 'text-primary' : 'text-muted-foreground'}`}
+      >
+        {label} {active ? (sortDir === 'desc' ? '↓' : '↑') : ''}
+      </button>
+      {hint}
+    </div>
   )
 }
 
@@ -45,13 +51,23 @@ export function ConversationList({ sessions }: Props) {
   const [filterCompacted, setFilterCompacted] = useState(false)
   const [filterAgent, setFilterAgent] = useState(false)
   const [filterMcp, setFilterMcp] = useState(false)
+  const [filterAbandoned, setFilterAbandoned] = useState(false)
   const [search, setSearch] = useState('')
+
+  function isAbandoned(s: ConversationWithFacet) {
+    const totalMsgs = (s.user_message_count ?? 0) + (s.assistant_message_count ?? 0)
+    const totalTools = Object.values(s.tool_counts ?? {}).reduce((sum, c) => sum + c, 0)
+    return totalMsgs < 6 && totalTools < 5 && (s.git_commits ?? 0) === 0
+  }
+
+  const abandonedCount = useMemo(() => sessions.filter(isAbandoned).length, [sessions])
 
   const filtered = useMemo(() => {
     let s = sessions
     if (filterCompacted) s = s.filter(x => x.has_compaction)
     if (filterAgent)     s = s.filter(x => x.uses_task_agent)
     if (filterMcp)       s = s.filter(x => x.uses_mcp)
+    if (filterAbandoned) s = s.filter(isAbandoned)
     if (search) {
       const q = search.toLowerCase()
       s = s.filter(x =>
@@ -61,7 +77,7 @@ export function ConversationList({ sessions }: Props) {
       )
     }
     return s
-  }, [sessions, filterCompacted, filterAgent, filterMcp, search])
+  }, [sessions, filterCompacted, filterAgent, filterMcp, filterAbandoned, search])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -135,8 +151,22 @@ export function ConversationList({ sessions }: Props) {
           />
           🔌 mcp
         </label>
+        <label className="flex items-center gap-1.5 text-[13px] text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+          <input
+            type="checkbox"
+            checked={filterAbandoned}
+            onChange={e => { setFilterAbandoned(e.target.checked); setPage(1) }}
+            className="accent-red-500"
+          />
+          👻 abandoned
+        </label>
         <span className="ml-auto text-[13px] text-muted-foreground">
           {filtered.length} sessions
+          {abandonedCount > 0 && !filterAbandoned && (
+            <span className="text-muted-foreground/40 ml-2">
+              · {abandonedCount} ghost ({Math.round(abandonedCount / sessions.length * 100)}%)
+            </span>
+          )}
         </span>
       </div>
 
@@ -154,11 +184,13 @@ export function ConversationList({ sessions }: Props) {
                 <th className="px-3 py-2 text-left"><SortableHeader label="Model" k="model" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} /></th>
                 <th className="px-3 py-2 text-right">
                   <SortableHeader
-                    label={source === 'claude' ? 'Cost' : 'Premium'}
+                    label={source === 'claude' ? 'Est. cost' : 'Premium'}
                     k={source === 'claude' ? 'estimated_cost' : 'premium_requests'}
                     sortKey={sortKey}
                     sortDir={sortDir}
                     onSort={toggleSort}
+                    align="right"
+                    hint={source === 'claude' ? <ClaudeCostHint align="right" /> : undefined}
                   />
                 </th>
                 <th className="px-3 py-2 text-left"><span className="text-[12px] font-bold uppercase tracking-wider text-muted-foreground">Flags</span></th>
@@ -226,14 +258,19 @@ export function ConversationList({ sessions }: Props) {
                       {source === 'claude' ? formatCost(s.estimated_cost) : (s.premium_requests ?? 0).toLocaleString()}
                     </td>
                     <td className="px-3 py-2">
-                      <FeatureBadges
-                        has_compaction={s.has_compaction}
-                        uses_task_agent={s.uses_task_agent}
-                        uses_mcp={s.uses_mcp}
-                        uses_web_search={s.uses_web_search}
-                        uses_web_fetch={s.uses_web_fetch}
-                        has_thinking={s.has_thinking}
-                      />
+                      <div className="flex items-center gap-1">
+                        <FeatureBadges
+                          has_compaction={s.has_compaction}
+                          uses_task_agent={s.uses_task_agent}
+                          uses_mcp={s.uses_mcp}
+                          uses_web_search={s.uses_web_search}
+                          uses_web_fetch={s.uses_web_fetch}
+                          has_thinking={s.has_thinking}
+                        />
+                        {isAbandoned(s) && (
+                          <span className="text-muted-foreground/40 text-[11px]" title="Ghost session: few messages, no commits, no tool calls">👻</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )

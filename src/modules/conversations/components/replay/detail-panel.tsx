@@ -1,6 +1,7 @@
 'use client'
 
-import { formatCost, formatTokens, formatDuration, formatDate, workspaceDisplayName } from '@/common/helpers/formatters'
+import { ClaudeCostHint } from '@/common/components/claude-cost-disclosure'
+import { formatCost, formatTokens, formatDuration, workspaceDisplayName } from '@/common/helpers/formatters'
 import type { PlaybackData, SessionInfo } from '@/common/types/models'
 
 interface Props {
@@ -66,7 +67,10 @@ export function DetailPanel({ replay, meta }: Props) {
           <div className="border-t border-border/50 pt-1 mt-1 flex justify-between font-bold">
             <span className="text-muted-foreground">TOTAL</span>
             <span className="text-foreground">{formatTokens(totalTokens)}</span>
-            <span style={{ color: 'var(--label-amber)' }}>{formatCost(replay.total_cost)}</span>
+            <span className="inline-flex items-center gap-1" style={{ color: 'var(--label-amber)' }}>
+              {formatCost(replay.total_cost)}
+              <ClaudeCostHint align="right" />
+            </span>
           </div>
         </div>
       </PanelSection>
@@ -96,7 +100,7 @@ export function DetailPanel({ replay, meta }: Props) {
       {replay.compactions.length > 0 && (
         <PanelSection title="Compaction Timeline">
           <div className="space-y-1.5">
-            {replay.compactions.map((c, i) => (
+            {replay.compactions.map((c) => (
               <div key={c.uuid} className="flex items-start gap-1.5">
                 <span className="text-amber-400">⚡</span>
                 <div>

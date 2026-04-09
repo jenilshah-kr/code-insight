@@ -50,7 +50,7 @@ export function ModelBreakdownDonut({ modelUsage }: Props) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(val: any) => [
             source === 'claude' ? formatCost(val ?? 0) : formatTokens(val ?? 0),
-            source === 'claude' ? 'cost' : 'tokens',
+            source === 'claude' ? 'estimated API cost' : 'tokens',
           ]}
         />
         <Legend

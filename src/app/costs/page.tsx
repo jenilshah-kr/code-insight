@@ -4,6 +4,7 @@ import { useState } from 'react'
 import useSWR from 'swr'
 import { PageHeader } from '@/common/components/layout/page-header'
 import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { ClaudeCostHint, ClaudeCostNote } from '@/common/components/claude-cost-disclosure'
 import { SourceUnsupportedState } from '@/common/components/source-unsupported-state'
 import { SpendOverTimeChart } from '@/modules/spending/components/spend-over-time-chart'
 import { SpendByWorkspaceChart } from '@/modules/spending/components/spend-by-workspace-chart'
@@ -16,7 +17,7 @@ import type { SpendAnalytics } from '@/common/types/models'
 const fetcher = (url: string) =>
   fetch(url).then(r => { if (!r.ok) throw new Error(`API error ${r.status}`); return r.json() })
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="data-card">
       <div className="section-label mb-3">{title}</div>
@@ -37,7 +38,7 @@ export default function CostsPage() {
   if (!capabilities.costs) {
     return (
       <div className="flex flex-col min-h-screen">
-        <PageHeader title="claude-code-analytics · costs" subtitle="estimated spend by source" />
+        <PageHeader title="claude-code-analytics · costs" subtitle="estimated Claude API spend by source" />
         <div className="p-6">
           <SourceUnsupportedState
             feature="Cost analytics"
@@ -50,7 +51,7 @@ export default function CostsPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <PageHeader title="claude-code-analytics · costs" subtitle="estimated spend from ~/.claude/" />
+      <PageHeader title="claude-code-analytics · costs" subtitle="estimated Claude API spend from ~/.claude/" />
       <div className="p-6 space-y-6">
         {error && <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>}
         {isLoading && (
@@ -62,10 +63,14 @@ export default function CostsPage() {
         )}
         {data && (
           <>
+            <ClaudeCostNote />
+
             {/* Hero row */}
             <div className="flex flex-wrap gap-x-10 gap-y-6 py-4 border-b border-border/60 items-end">
               <div className="space-y-1">
-                <div className="section-label">total estimated cost</div>
+                <div className="section-label">
+                  <ClaudeCostHint label={<span>total est. API cost</span>} align="left" />
+                </div>
                 <div className="font-mono font-bold tabular-nums stat-amber leading-none" style={{ fontSize: '2.4rem', letterSpacing: '-0.02em' }}>{formatCost(data.total_cost)}</div>
               </div>
               <div className="space-y-1">
@@ -231,14 +236,14 @@ export default function CostsPage() {
 
             {/* Cost over time — full width, primary chart */}
             {data.daily.length > 0 && (
-              <Card title="Cost Over Time">
+              <Card title="Estimated API Cost Over Time">
                 <SpendOverTimeChart daily={data.daily} />
               </Card>
             )}
 
             {/* Cost by project — full width */}
             {data.by_project.length > 0 && (
-              <Card title="Cost by Project">
+              <Card title="Estimated API Cost by Project">
                 <SpendByWorkspaceChart projects={data.by_project} />
               </Card>
             )}
@@ -254,7 +259,7 @@ export default function CostsPage() {
             </Card>
 
             {/* Pricing reference */}
-            <Card title="Pricing Reference ⚠ Estimates Only">
+            <Card title="Claude API Pricing Reference">
               <div className="overflow-x-auto">
                 <table className="w-full text-[13px] font-mono">
                   <thead>
@@ -277,7 +282,7 @@ export default function CostsPage() {
                   </tbody>
                 </table>
                 <p className="text-[12px] text-muted-foreground/50 mt-2">
-                  ⚠ These are estimates. Update pricing in <code className="text-muted-foreground">lib/pricing.ts</code>
+                  These rates drive the app&apos;s Claude API estimates, not Claude Code subscription pricing. Update pricing in <code className="text-muted-foreground">src/common/helpers/rates.ts</code>
                 </p>
               </div>
             </Card>

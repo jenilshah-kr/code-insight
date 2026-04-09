@@ -1,11 +1,15 @@
 'use client'
 
+import { ClaudeCostNote } from '@/common/components/claude-cost-disclosure'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
 import { PageHeader } from '@/common/components/layout/page-header'
 import { useAnalyticsSWR } from '@/common/helpers/analytics-swr'
 import { ConversationList } from '@/modules/conversations/components/conversation-list'
+import { ThinkingRoiPanel } from '@/modules/conversations/components/thinking-roi-panel'
 import type { ConversationWithFacet } from '@/common/types/models'
 
 export default function SessionsPage() {
+  const { source } = useAnalyticsSource()
   const { data, error, isLoading } = useAnalyticsSWR<{ sessions: ConversationWithFacet[]; total: number }>(
     '/api/sessions',
     { refreshInterval: 5_000 }
@@ -22,6 +26,7 @@ export default function SessionsPage() {
         {error && (
           <p className="text-[#dc2626] dark:text-[#f87171] text-sm font-mono">Error: {String(error)}</p>
         )}
+        {source === 'claude' && <ClaudeCostNote className="mb-4" />}
         {showLoading && (
           <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -29,7 +34,12 @@ export default function SessionsPage() {
             ))}
           </div>
         )}
-        {data && <ConversationList sessions={data.sessions} />}
+        {data && (
+          <div className="space-y-4">
+            {source === 'claude' && <ThinkingRoiPanel sessions={data.sessions} />}
+            <ConversationList sessions={data.sessions} />
+          </div>
+        )}
       </div>
     </div>
   )

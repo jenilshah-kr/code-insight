@@ -42,7 +42,7 @@ export function SpendOverTimeChart({ daily }: Props) {
         <Tooltip
           contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 12 }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(val: any) => [formatCost(val ?? 0), 'spend']}
+          formatter={(val: any) => [formatCost(val ?? 0), 'estimated API cost']}
         />
         <Area
           type="monotone"

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { BarChart2, PieChart, Clock } from 'lucide-react'
+import { useAnalyticsSource } from '@/common/components/analytics-source-provider'
+import { ClaudeCostHint } from '@/common/components/claude-cost-disclosure'
 import { UsageOverTimeChart } from './usage-over-time-chart'
 import { BusyHoursChart } from './busy-hours-chart'
 import { ModelBreakdownDonut } from './model-breakdown-donut'
@@ -68,7 +70,7 @@ function ChartCard({
   children,
 }: {
   icon: React.ReactNode
-  title: string
+  title: React.ReactNode
   children: React.ReactNode
 }) {
   return (
@@ -110,6 +112,7 @@ interface DashboardStatsPayload {
 }
 
 export function DashboardClient() {
+  const { source } = useAnalyticsSource()
   const defaults = getDefaultDates()
   const [dateFrom, setDateFrom] = useState(defaults.from)
   const [dateTo, setDateTo] = useState(defaults.to)
@@ -217,7 +220,17 @@ export function DashboardClient() {
           <BusyHoursChart hourCounts={hourCounts} />
         </ChartCard>
 
-        <ChartCard icon={<PieChart size={13} />} title="Model Distribution">
+        <ChartCard
+          icon={<PieChart size={13} />}
+          title={source === 'claude'
+            ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span>Model Distribution</span>
+                <ClaudeCostHint align="left" />
+              </span>
+            )
+            : 'Model Distribution'}
+        >
           {stats.modelUsage && Object.keys(stats.modelUsage).length > 0 ? (
             <ModelBreakdownDonut modelUsage={stats.modelUsage} />
           ) : (
